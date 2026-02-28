@@ -1,5 +1,5 @@
 # 🔐 SecureAgent
-![CI](../../actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/anshsaxena15112005/secure-agent/actions/workflows/ci.yml/badge.svg)
 
 SecureAgent is a runtime security layer for agentic AI systems.  
 It protects LLM-powered agents from prompt injection, unsafe tool execution, and sensitive data leakage through policy-based enforcement and runtime monitoring.
