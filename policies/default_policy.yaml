@@ -1,0 +1,20 @@
+# Default Security Policy for the Agent
+version: "1.0"
+description: "Base policy rules for agent interactions"
+
+default_role:
+  name: "agent_user"
+  description: "Standard permissions for authenticated users"
+  allowed_actions:
+    - "read_status"
+    - "view_logs"
+    - "execute_safe_command"
+  denied_actions:
+    - "modify_system_config"
+    - "delete_records"
+
+admin_role:
+  name: "system_admin"
+  description: "Full administrative access"
+  allowed_actions:
+    - "*"
