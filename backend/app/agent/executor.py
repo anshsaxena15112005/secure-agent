@@ -1,17 +1,13 @@
 from typing import Dict
 
 from app.security import allow_tool_call, log_event
-from app.tools import calculator, notes_store
+from app.tools import TOOLS
 
 
 def execute(plan: Dict) -> Dict:
-    """
-    Execute a planned tool call safely.
-    """
     goal = plan["goal"]
     tool_name = plan["tool"]
 
-    # 1) Security check before execution
     allowed, reason, risk = allow_tool_call(goal, tool_name)
 
     if not allowed:
@@ -22,6 +18,7 @@ def execute(plan: Dict) -> Dict:
             reason=reason,
             risk=risk
         )
+
         return {
             "status": "blocked",
             "tool": tool_name,
@@ -29,28 +26,17 @@ def execute(plan: Dict) -> Dict:
             "risk": risk
         }
 
-    # 2) Execute allowed tool
-    if tool_name == "calculator":
-        output = calculator(goal)
-    elif tool_name == "notes_store":
-        output = notes_store(goal)
-    else:
-        # fallback safety
-        log_event(
-            event_type="TOOL_BLOCKED",
-            goal=goal,
-            tool=tool_name,
-            reason="Unknown tool requested",
-            risk=80
-        )
+    # TOOL REGISTRY LOOKUP
+    tool = TOOLS.get(tool_name)
+
+    if not tool:
         return {
-            "status": "blocked",
-            "tool": tool_name,
-            "reason": "Unknown tool requested",
-            "risk": 80
+            "status": "error",
+            "reason": "Tool not found"
         }
 
-    # 3) Log successful execution
+    output = tool(goal)
+
     log_event(
         event_type="TOOL_OK",
         goal=goal,
