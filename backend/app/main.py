@@ -1,35 +1,48 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-from .agent import planner, executor
-from .security import allow_tool_call, log_event
-from .db import init_db
 
-app = FastAPI(title="SecureAgent")
+from backend.app.db import init_db
+from backend.app.agent.planner import plan_task
+from backend.app.agent.executor import execute_tool
+from backend.app.security import allow_tool_call
 
-# Create database on start
+app = FastAPI()
+
 init_db()
+
 
 class AgentRequest(BaseModel):
     goal: str
 
+
 @app.get("/")
 def root():
-    return {"message": "Secure AI Agent Running", "docs": "/docs"}
+    return {"message": "Secure Agent Running"}
+
 
 @app.post("/agent/run")
 def run_agent(request: AgentRequest):
+
     goal = request.goal
 
-    # 1. Plan
-    tool_name, tool_input = planner.plan_task(goal)
+    # planner decides tool
+    tool_name, tool_input = plan_task(goal)
 
-    # 2. Security Check
+    # security layer
     allowed, reason, risk = allow_tool_call(goal, tool_name)
 
     if not allowed:
-        log_event("PROMPT_BLOCKED", goal, tool_name, reason, risk)
-        return {"status": "blocked", "reason": reason, "risk_score": risk}
+        return {
+            "status": "blocked",
+            "reason": reason,
+            "risk": risk
+        }
 
-    # 3. Execute
-    result = executor.execute_tool(tool_name, tool_input, goal)
-    return {"status": "ok", "output": result}
+    # executor runs tool
+    result = execute_tool(tool_name, tool_input)
+
+    return {
+        "status": "ok",
+        "tool": tool_name,
+        "output": result
+    }

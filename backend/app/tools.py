@@ -1,20 +1,17 @@
+notes_memory = []
+
+
 def calculator(expression: str):
+
     try:
-        return eval(expression)
-    except Exception:
-        return "Invalid expression"
-
-
-notes = []
+        result = eval(expression)
+        return result
+    except:
+        return "invalid expression"
 
 
 def notes_store(text: str):
-    notes.append(text)
-    return {"stored": text}
 
+    notes_memory.append(text)
 
-# TOOL REGISTRY
-TOOLS = {
-    "calculator": calculator,
-    "notes_store": notes_store,
-}
+    return "note stored"

@@ -7,8 +7,8 @@ blocked_patterns:
 exfiltration_patterns:
   - api key
   - password
-  - token
   - secret
+  - token
 
 allowed_tools:
   - calculator
