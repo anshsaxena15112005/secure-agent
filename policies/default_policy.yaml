@@ -3,15 +3,21 @@ blocked_patterns:
   - reveal system prompt
   - jailbreak
   - bypass
+  - developer message
 
 exfiltration_patterns:
   - api key
   - password
-  - secret
   - token
+  - secret
 
 allowed_tools:
   - calculator
   - notes_store
 
 block_threshold: 60
+
+risk_scores:
+  prompt_injection: 60
+  exfiltration: 60
+  tool_abuse: 80
