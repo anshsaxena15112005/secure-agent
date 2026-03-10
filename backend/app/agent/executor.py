@@ -1,52 +1,16 @@
-from typing import Dict
+from ..tools import TOOLS # Ensure this matches tools.py
+from ..security import log_event
 
-from app.security import allow_tool_call, log_event
-from app.tools import TOOLS
+def execute_tool(tool_name, tool_input, goal):
+    tool_func = TOOLS.get(tool_name)
+    
+    if not tool_func:
+        return "Error: Unknown tool"
 
-
-def execute(plan: Dict) -> Dict:
-    goal = plan["goal"]
-    tool_name = plan["tool"]
-
-    allowed, reason, risk = allow_tool_call(goal, tool_name)
-
-    if not allowed:
-        log_event(
-            event_type="PROMPT_BLOCKED",
-            goal=goal,
-            tool=tool_name,
-            reason=reason,
-            risk=risk
-        )
-
-        return {
-            "status": "blocked",
-            "tool": tool_name,
-            "reason": reason,
-            "risk": risk
-        }
-
-    # TOOL REGISTRY LOOKUP
-    tool = TOOLS.get(tool_name)
-
-    if not tool:
-        return {
-            "status": "error",
-            "reason": "Tool not found"
-        }
-
-    output = tool(goal)
-
-    log_event(
-        event_type="TOOL_OK",
-        goal=goal,
-        tool=tool_name,
-        reason="Executed successfully",
-        risk=0
-    )
-
-    return {
-        "status": "ok",
-        "tool": tool_name,
-        "output": output
-    }
+    try:
+        output = tool_func(tool_input)
+        # Log success to DB
+        log_event("TOOL_OK", goal, tool_name, "Executed successfully", 0)
+        return output
+    except Exception as e:
+        return f"Execution Error: {str(e)}"

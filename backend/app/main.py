@@ -1,49 +1,35 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from .agent import planner, executor
+from .security import allow_tool_call, log_event
+from .db import init_db
 
-from app.db import init_db, SessionLocal, SecurityEvent
-from app.agent.planner import plan
-from app.agent.executor import execute
+app = FastAPI(title="SecureAgent")
 
-app = FastAPI(title="SecureAgent Backend")
-
-# Initialize database
+# Create database on start
 init_db()
 
-
-class RunRequest(BaseModel):
+class AgentRequest(BaseModel):
     goal: str
 
-
 @app.get("/")
-def home():
-    return {"message": "SecureAgent backend is running"}
+def root():
+    return {"message": "Secure AI Agent Running", "docs": "/docs"}
 
+@app.post("/agent/run")
+def run_agent(request: AgentRequest):
+    goal = request.goal
 
-@app.post("/run")
-def run(req: RunRequest):
-    execution_plan = plan(req.goal)
-    result = execute(execution_plan)
-    return result
+    # 1. Plan
+    tool_name, tool_input = planner.plan_task(goal)
 
+    # 2. Security Check
+    allowed, reason, risk = allow_tool_call(goal, tool_name)
 
-@app.get("/events")
-def get_events(limit: int = 50):
-    db = SessionLocal()
-    try:
-        rows = db.query(SecurityEvent).order_by(SecurityEvent.id.desc()).limit(limit).all()
+    if not allowed:
+        log_event("PROMPT_BLOCKED", goal, tool_name, reason, risk)
+        return {"status": "blocked", "reason": reason, "risk_score": risk}
 
-        return [
-            {
-                "id": row.id,
-                "timestamp": str(row.timestamp),
-                "event_type": row.event_type,
-                "tool": row.tool,
-                "reason": row.reason,
-                "risk": row.risk,
-                "goal": row.goal,
-            }
-            for row in rows
-        ]
-    finally:
-        db.close()
+    # 3. Execute
+    result = executor.execute_tool(tool_name, tool_input, goal)
+    return {"status": "ok", "output": result}
