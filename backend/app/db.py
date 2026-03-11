@@ -1,4 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String
+from datetime import datetime
+
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 DATABASE_URL = "sqlite:///./secureagent.db"
@@ -16,7 +18,8 @@ Base = declarative_base()
 class SecurityEvent(Base):
     __tablename__ = "security_events"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
     event_type = Column(String)
     tool = Column(String)
     reason = Column(String)
