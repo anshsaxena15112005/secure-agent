@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SecureAgent Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 24px;
+            background: #f7f9fc;
+            color: #222;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtext {
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 15px;
+            color: #666;
+        }
+
+        .card p {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f3f4f6;
+        }
+
+        .blocked {
+            color: #b91c1c;
+            font-weight: bold;
+        }
+
+        .allowed {
+            color: #15803d;
+            font-weight: bold;
+        }
+
+        pre {
+            background: #111827;
+            color: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>SecureAgent Dashboard</h1>
+    <div class="subtext">Backend-first AI agent security monitoring</div>
+
+    <div class="cards">
+        <div class="card">
+            <h3>Total Events</h3>
+            <p id="total-events">0</p>
+        </div>
+        <div class="card">
+            <h3>Blocked Events</h3>
+            <p id="blocked-events">0</p>
+        </div>
+        <div class="card">
+            <h3>Allowed Events</h3>
+            <p id="allowed-events">0</p>
+        </div>
+        <div class="card">
+            <h3>High Risk Events</h3>
+            <p id="high-risk-events">0</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Run Red-Team Test</h2>
+        <button onclick="runRedTeam()">Run Test</button>
+        <pre id="red-team-output">No test run yet.</pre>
+    </div>
+
+    <div class="section">
+        <h2>Recent Events</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>Event Type</th>
+                    <th>Tool</th>
+                    <th>Risk</th>
+                    <th>Goal</th>
+                </tr>
+            </thead>
+            <tbody id="events-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        async function loadStats() {
+            const response = await fetch('/security/stats');
+            const data = await response.json();
+
+            document.getElementById('total-events').textContent = data.total_events;
+            document.getElementById('blocked-events').textContent = data.blocked_events;
+            document.getElementById('allowed-events').textContent = data.allowed_events;
+            document.getElementById('high-risk-events').textContent = data.high_risk_events;
+        }
+
+        async function loadEvents() {
+            const response = await fetch('/events');
+            const data = await response.json();
+
+            const tbody = document.getElementById('events-body');
+            tbody.innerHTML = '';
+
+            data.forEach(event => {
+                const row = document.createElement('tr');
+
+                const eventTypeClass =
+                    event.event_type === 'PROMPT_BLOCKED' || event.event_type === 'TOOL_BLOCKED'
+                    ? 'blocked'
+                    : 'allowed';
+
+                row.innerHTML = `
+                    <td>${event.id}</td>
+                    <td>${event.timestamp || ''}</td>
+                    <td class="${eventTypeClass}">${event.event_type}</td>
+                    <td>${event.tool || ''}</td>
+                    <td>${event.risk ?? ''}</td>
+                    <td>${event.goal || ''}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        async function runRedTeam() {
+            const output = document.getElementById('red-team-output');
+            output.textContent = 'Running red-team test...';
+
+            const response = await fetch('/security/red-team-test', {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+            output.textContent = JSON.stringify(data, null, 2);
+
+            await loadStats();
+            await loadEvents();
+        }
+
+        async function initDashboard() {
+            await loadStats();
+            await loadEvents();
+        }
+
+        initDashboard();
+    </script>
+</body>
+</html>
