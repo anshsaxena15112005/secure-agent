@@ -3,155 +3,999 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SecureAgent Dashboard</title>
+    <title>SecureAgent Security Console</title>
     <style>
+        :root {
+            --bg: #10161d;
+            --bg-2: #151c24;
+            --panel: rgba(27, 35, 45, 0.82);
+            --panel-strong: rgba(23, 30, 39, 0.92);
+            --line: rgba(148, 163, 184, 0.10);
+            --line-strong: rgba(125, 145, 170, 0.22);
+            --text: #e8edf2;
+            --muted: #99a7b5;
+
+            --accent: #6f8fa6;
+            --accent-2: #587487;
+            --accent-soft: #8ba5b7;
+            --teal: #6fa7a1;
+
+            --green: #6f9b7d;
+            --green-bg: rgba(111, 155, 125, 0.14);
+
+            --red: #b97a7a;
+            --red-bg: rgba(185, 122, 122, 0.14);
+
+            --amber: #b89a6b;
+            --amber-bg: rgba(184, 154, 107, 0.14);
+
+            --shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+            --radius: 22px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 24px;
-            background: #f7f9fc;
-            color: #222;
-        }
-
-        h1 {
-            margin-bottom: 8px;
-        }
-
-        .subtext {
-            color: #666;
-            margin-bottom: 24px;
-        }
-
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 18px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-
-        .card h3 {
-            margin: 0 0 10px 0;
-            font-size: 15px;
-            color: #666;
-        }
-
-        .card p {
             margin: 0;
-            font-size: 28px;
-            font-weight: bold;
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 20% 8%, rgba(111, 167, 161, 0.05), transparent 18%),
+                radial-gradient(circle at 85% 10%, rgba(111, 143, 166, 0.05), transparent 18%),
+                linear-gradient(180deg, #0f141b 0%, #131922 42%, #151c24 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
         }
 
-        .section {
-            background: white;
-            border-radius: 12px;
-            padding: 18px;
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(151, 165, 181, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(151, 165, 181, 0.025) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: radial-gradient(circle at center, rgba(0,0,0,1), rgba(0,0,0,0.30));
+            pointer-events: none;
+            animation: driftGrid 28s linear infinite;
+            z-index: 0;
+        }
+
+        @keyframes driftGrid {
+            from { transform: translateY(0px); }
+            to { transform: translateY(46px); }
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.10;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .orb-1 {
+            width: 300px;
+            height: 300px;
+            left: -80px;
+            top: 80px;
+            background: rgba(111, 167, 161, 0.16);
+        }
+
+        .orb-2 {
+            width: 320px;
+            height: 320px;
+            right: -100px;
+            top: 120px;
+            background: rgba(111, 143, 166, 0.16);
+        }
+
+        .orb-3 {
+            width: 280px;
+            height: 280px;
+            left: 28%;
+            bottom: -100px;
+            background: rgba(139, 165, 183, 0.10);
+        }
+
+        .shell {
+            max-width: 1480px;
+            margin: 0 auto;
+            padding: 28px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            padding: 26px 28px;
+            border-radius: 28px;
+            background: linear-gradient(180deg, rgba(26,34,44,0.88), rgba(20,27,35,0.80));
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+            position: relative;
+            overflow: hidden;
             margin-bottom: 24px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
         }
 
-        button {
-            background: #2563eb;
+        .topbar::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, rgba(255,255,255,0.02), transparent 28%, transparent 72%, rgba(255,255,255,0.015));
+            pointer-events: none;
+        }
+
+        .title-wrap h1 {
+            margin: 0;
+            font-size: 46px;
+            letter-spacing: -0.04em;
+            color: #edf2f7;
+        }
+
+        .title-wrap p {
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 17px;
+        }
+
+        .topbar-meta {
+            display: grid;
+            gap: 10px;
+            justify-items: end;
+            min-width: 260px;
+        }
+
+        .meta-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.03);
+            color: var(--muted);
+            padding: 10px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            backdrop-filter: blur(10px);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--teal);
+            box-shadow: 0 0 0 0 rgba(111,167,161,0.35);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(111,167,161,0.35); }
+            70% { box-shadow: 0 0 0 10px rgba(111,167,161,0); }
+            100% { box-shadow: 0 0 0 0 rgba(111,167,161,0); }
+        }
+
+        .btn {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(125,145,170,0.18);
+            background: linear-gradient(180deg, var(--accent), var(--accent-2));
             color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
+            padding: 11px 16px;
+            border-radius: 14px;
             cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+            box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.03);
+        }
+
+        .btn.secondary {
+            background: rgba(255,255,255,0.03);
+            color: var(--text);
+            border: 1px solid var(--line);
+            box-shadow: none;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(220px, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .tilt-card {
+            position: relative;
+            transform-style: preserve-3d;
+            will-change: transform;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .tilt-card::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            background: linear-gradient(135deg, rgba(255,255,255,0.025), transparent 30%, transparent 75%, rgba(255,255,255,0.015));
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        .tilt-card::after {
+            content: "";
+            position: absolute;
+            inset: -18%;
+            border-radius: inherit;
+            background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(139, 165, 183, 0.10), transparent 28%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+            filter: blur(20px);
+        }
+
+        .tilt-card:hover::after {
+            opacity: 1;
+        }
+
+        .metric-card {
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background:
+                linear-gradient(180deg, rgba(28,36,46,0.94), rgba(21,28,36,0.90));
+            box-shadow: var(--shadow);
+            padding: 22px;
+            overflow: hidden;
+        }
+
+        .metric-card:hover {
+            border-color: var(--line-strong);
+            box-shadow: 0 18px 40px rgba(0,0,0,0.26);
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .metric-value {
+            font-size: 44px;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 12px;
+        }
+
+        .metric-trend {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .metric-bar {
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.05);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .metric-bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--teal), var(--accent-soft));
+            box-shadow: 0 0 12px rgba(111, 167, 161, 0.16);
+            transition: width 0.5s ease;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .panel {
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(28,36,46,0.95), rgba(20,27,35,0.92));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel:hover {
+            box-shadow: 0 18px 40px rgba(0,0,0,0.26);
+            border-color: var(--line-strong);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: -0.02em;
+        }
+
+        .panel-subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
             font-size: 14px;
         }
 
-        button:hover {
-            background: #1d4ed8;
+        .panel-body {
+            padding: 20px 22px 22px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .meter-wrap {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .meter-ring {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .meter-ring svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .meter-ring .bg {
+            stroke: rgba(255,255,255,0.06);
+            stroke-width: 12;
+            fill: none;
+        }
+
+        .meter-ring .progress {
+            stroke: var(--teal);
+            stroke-width: 12;
+            fill: none;
+            stroke-linecap: round;
+            stroke-dasharray: 408;
+            stroke-dashoffset: 408;
+            transition: stroke-dashoffset 0.7s ease, stroke 0.4s ease;
+            filter: drop-shadow(0 0 8px rgba(111,167,161,0.16));
+        }
+
+        .meter-center {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            text-align: center;
+        }
+
+        .meter-center .value {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .meter-center .label {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .meter-side {
+            display: grid;
+            gap: 12px;
+        }
+
+        .threat-chip {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.03);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .threat-desc {
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .sparkline-wrap {
+            display: grid;
+            gap: 14px;
+        }
+
+        .sparkline-box {
+            height: 180px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.02);
+            padding: 12px;
+            position: relative;
+        }
+
+        .sparkline-box svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .spark-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(120px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .mini-card {
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.02);
+            padding: 16px;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .mini-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--line-strong);
+            box-shadow: 0 0 18px rgba(139, 165, 183, 0.06);
+        }
+
+        .mini-card h4 {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .mini-card p {
+            margin: 0;
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1.05fr 1.95fr;
+            gap: 22px;
+            align-items: start;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .results-list {
+            display: grid;
+            gap: 12px;
+            max-height: 620px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .result-card {
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.02);
+            padding: 15px;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+            position: relative;
+        }
+
+        .result-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--line-strong);
+            box-shadow: 0 0 18px rgba(139, 165, 183, 0.06);
+        }
+
+        .result-card h4 {
+            margin: 0 0 12px;
+            font-size: 15px;
+            line-height: 1.45;
+            color: #dbe5ef;
+        }
+
+        .meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            border: 1px solid transparent;
+        }
+
+        .badge-blocked {
+            background: var(--red-bg);
+            color: #f0cccc;
+            border-color: rgba(185,122,122,0.20);
+        }
+
+        .badge-allowed {
+            background: var(--green-bg);
+            color: #c8dfcf;
+            border-color: rgba(111,155,125,0.20);
+        }
+
+        .badge-error {
+            background: var(--amber-bg);
+            color: #eadbb9;
+            border-color: rgba(184,154,107,0.20);
+        }
+
+        .badge-risk {
+            background: rgba(139,165,183,0.10);
+            color: #d2dee8;
+            border-color: rgba(139,165,183,0.16);
+        }
+
+        .reason {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .table-wrap {
+            overflow: auto;
+            border-radius: 14px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 16px;
         }
 
         th, td {
-            padding: 10px;
-            border-bottom: 1px solid #e5e7eb;
             text-align: left;
+            padding: 14px 14px;
+            border-bottom: 1px solid var(--line);
             vertical-align: top;
         }
 
         th {
-            background: #f3f4f6;
+            position: sticky;
+            top: 0;
+            background: rgba(25, 33, 43, 0.98);
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            z-index: 1;
         }
 
-        .blocked {
-            color: #b91c1c;
-            font-weight: bold;
+        tr:hover td {
+            background: rgba(255,255,255,0.018);
         }
 
-        .allowed {
-            color: #15803d;
-            font-weight: bold;
+        td {
+            font-size: 14px;
         }
 
-        pre {
-            background: #111827;
-            color: #f9fafb;
-            padding: 12px;
-            border-radius: 8px;
-            overflow-x: auto;
+        .event-type {
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .event-blocked {
+            color: #e2b5b5;
+        }
+
+        .event-allowed {
+            color: #bcd7c3;
+        }
+
+        .goal-cell {
+            max-width: 420px;
+            word-break: break-word;
+            color: #d9e4ef;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .empty-state {
+            padding: 18px;
+            border: 1px dashed var(--line);
+            border-radius: 14px;
+            color: var(--muted);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .footer-note {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        @media (max-width: 1180px) {
+            .analysis-grid,
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-4 {
+                grid-template-columns: repeat(2, minmax(220px, 1fr));
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .topbar-meta {
+                justify-items: start;
+            }
+
+            .meta-row {
+                justify-content: flex-start;
+            }
+
+            .meter-wrap {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .grid-4,
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .title-wrap h1 {
+                font-size: 34px;
+            }
+
+            .shell {
+                padding: 16px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>SecureAgent Dashboard</h1>
-    <div class="subtext">Backend-first AI agent security monitoring</div>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
 
-    <div class="cards">
-        <div class="card">
-            <h3>Total Events</h3>
-            <p id="total-events">0</p>
-        </div>
-        <div class="card">
-            <h3>Blocked Events</h3>
-            <p id="blocked-events">0</p>
-        </div>
-        <div class="card">
-            <h3>Allowed Events</h3>
-            <p id="allowed-events">0</p>
-        </div>
-        <div class="card">
-            <h3>High Risk Events</h3>
-            <p id="high-risk-events">0</p>
-        </div>
-    </div>
+    <div class="shell">
+        <div class="topbar">
+            <div class="title-wrap">
+                <h1>SecureAgent Console</h1>
+                <p>Runtime monitoring for backend-first AI agent security</p>
+            </div>
 
-    <div class="section">
-        <h2>Run Red-Team Test</h2>
-        <button onclick="runRedTeam()">Run Test</button>
-        <pre id="red-team-output">No test run yet.</pre>
-    </div>
+            <div class="topbar-meta">
+                <div class="meta-row">
+                    <div class="pill"><span class="live-dot"></span> Environment: Local</div>
+                    <div class="pill">Mode: Monitoring</div>
+                </div>
+                <div class="meta-row">
+                    <div class="pill" id="last-updated">Last updated: --</div>
+                    <button class="btn secondary" onclick="refreshAll()">Refresh</button>
+                </div>
+            </div>
+        </div>
 
-    <div class="section">
-        <h2>Recent Events</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Timestamp</th>
-                    <th>Event Type</th>
-                    <th>Tool</th>
-                    <th>Risk</th>
-                    <th>Goal</th>
-                </tr>
-            </thead>
-            <tbody id="events-body"></tbody>
-        </table>
+        <div class="grid-4">
+            <div class="metric-card tilt-card">
+                <div class="metric-label">Total Events</div>
+                <div class="metric-value" id="total-events">0</div>
+                <div class="metric-trend">All recorded security events</div>
+                <div class="metric-bar"><div class="metric-bar-fill" id="bar-total"></div></div>
+            </div>
+
+            <div class="metric-card tilt-card">
+                <div class="metric-label">Blocked Events</div>
+                <div class="metric-value" id="blocked-events">0</div>
+                <div class="metric-trend">Policy-triggered blocked executions</div>
+                <div class="metric-bar"><div class="metric-bar-fill" id="bar-blocked"></div></div>
+            </div>
+
+            <div class="metric-card tilt-card">
+                <div class="metric-label">Allowed Events</div>
+                <div class="metric-value" id="allowed-events">0</div>
+                <div class="metric-trend">Requests executed successfully</div>
+                <div class="metric-bar"><div class="metric-bar-fill" id="bar-allowed"></div></div>
+            </div>
+
+            <div class="metric-card tilt-card">
+                <div class="metric-label">High Risk Events</div>
+                <div class="metric-value" id="high-risk-events">0</div>
+                <div class="metric-trend">Events with elevated risk scores</div>
+                <div class="metric-bar"><div class="metric-bar-fill" id="bar-highrisk"></div></div>
+            </div>
+        </div>
+
+        <div class="analysis-grid">
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Threat Level</h2>
+                        <div class="panel-subtitle">Current system-wide exposure based on recent security activity</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="meter-wrap">
+                        <div class="meter-ring">
+                            <svg viewBox="0 0 160 160">
+                                <circle class="bg" cx="80" cy="80" r="65"></circle>
+                                <circle class="progress" id="threat-progress" cx="80" cy="80" r="65"></circle>
+                            </svg>
+                            <div class="meter-center">
+                                <div class="value" id="threat-value">0%</div>
+                                <div class="label" id="threat-label">Low</div>
+                            </div>
+                        </div>
+                        <div class="meter-side">
+                            <div class="threat-chip" id="threat-chip">Threat posture stable</div>
+                            <div class="threat-desc" id="threat-desc">
+                                Awaiting activity analysis.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Live Activity</h2>
+                        <div class="panel-subtitle">Recent event risk movement across the latest backend activity</div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="sparkline-wrap">
+                        <div class="sparkline-box">
+                            <svg id="sparkline-svg" viewBox="0 0 500 160" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="sparkGrad" x1="0" x2="0" y1="0" y2="1">
+                                        <stop offset="0%" stop-color="#8ba5b7" stop-opacity="0.35"></stop>
+                                        <stop offset="100%" stop-color="#8ba5b7" stop-opacity="0.02"></stop>
+                                    </linearGradient>
+                                </defs>
+                                <path id="sparkline-area" fill="url(#sparkGrad)" stroke="none"></path>
+                                <path id="sparkline-line" fill="none" stroke="#8ba5b7" stroke-width="3" stroke-linecap="round"></path>
+                            </svg>
+                        </div>
+                        <div class="spark-meta">
+                            <div>Latest sample count: <strong id="spark-count">0</strong></div>
+                            <div>Average risk: <strong id="spark-avg">0</strong></div>
+                            <div>Peak risk: <strong id="spark-max">0</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Red-Team Simulation</h2>
+                        <div class="panel-subtitle">Validate prompt-injection and exfiltration defenses</div>
+                    </div>
+                </div>
+
+                <div class="panel-body">
+                    <div class="actions">
+                        <button class="btn" onclick="runRedTeam()">Run Test</button>
+                    </div>
+
+                    <div class="summary-grid">
+                        <div class="mini-card tilt-card">
+                            <h4>Total Tests</h4>
+                            <p id="rt-total">0</p>
+                        </div>
+                        <div class="mini-card tilt-card">
+                            <h4>Blocked</h4>
+                            <p id="rt-blocked">0</p>
+                        </div>
+                        <div class="mini-card tilt-card">
+                            <h4>Allowed</h4>
+                            <p id="rt-allowed">0</p>
+                        </div>
+                    </div>
+
+                    <div id="results-list" class="results-list">
+                        <div class="empty-state">No red-team simulation has been run in this session.</div>
+                    </div>
+
+                    <div class="footer-note">
+                        Tip: run the simulation after policy changes to validate updated defenses.
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Recent Events</h2>
+                        <div class="panel-subtitle">Latest backend security activity and execution outcomes</div>
+                    </div>
+                </div>
+
+                <div class="panel-body">
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Timestamp</th>
+                                    <th>Event Type</th>
+                                    <th>Tool</th>
+                                    <th>Risk</th>
+                                    <th>Goal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        let latestEvents = [];
+
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('last-updated').textContent =
+                `Last updated: ${now.toLocaleString()}`;
+        }
+
+        function setBars(total, blocked, allowed, highRisk) {
+            const safeTotal = total || 1;
+            document.getElementById('bar-total').style.width = '100%';
+            document.getElementById('bar-blocked').style.width = `${(blocked / safeTotal) * 100}%`;
+            document.getElementById('bar-allowed').style.width = `${(allowed / safeTotal) * 100}%`;
+            document.getElementById('bar-highrisk').style.width = `${(highRisk / safeTotal) * 100}%`;
+        }
+
+        function updateThreatMeter(total, blocked, highRisk) {
+            const score = total > 0
+                ? Math.min(100, Math.round(((blocked * 0.6) + (highRisk * 0.8)) / total * 100))
+                : 0;
+
+            const circumference = 2 * Math.PI * 65;
+            const offset = circumference - (score / 100) * circumference;
+
+            const progress = document.getElementById('threat-progress');
+            progress.style.strokeDasharray = `${circumference}`;
+            progress.style.strokeDashoffset = `${offset}`;
+
+            let label = 'Low';
+            let chip = 'Threat posture stable';
+            let desc = 'Security controls appear stable with limited high-risk activity.';
+            let color = '#6f9b7d';
+
+            if (score >= 70) {
+                label = 'High';
+                chip = 'Elevated threat posture';
+                desc = 'Multiple blocked or high-risk events indicate active hostile prompting or policy pressure.';
+                color = '#b97a7a';
+            } else if (score >= 40) {
+                label = 'Moderate';
+                chip = 'Moderate security pressure';
+                desc = 'Recent events show notable blocked or high-risk traffic that should be monitored closely.';
+                color = '#b89a6b';
+            }
+
+            progress.style.stroke = color;
+            progress.style.filter = `drop-shadow(0 0 8px ${color}55)`;
+
+            document.getElementById('threat-value').textContent = `${score}%`;
+            document.getElementById('threat-label').textContent = label;
+            document.getElementById('threat-chip').textContent = chip;
+            document.getElementById('threat-desc').textContent = desc;
+        }
+
+        function updateSparkline(events) {
+            const svgLine = document.getElementById('sparkline-line');
+            const svgArea = document.getElementById('sparkline-area');
+
+            const values = events.slice().reverse().map(e => Number(e.risk || 0));
+            const count = values.length;
+
+            document.getElementById('spark-count').textContent = count;
+
+            if (!count) {
+                svgLine.setAttribute('d', '');
+                svgArea.setAttribute('d', '');
+                document.getElementById('spark-avg').textContent = '0';
+                document.getElementById('spark-max').textContent = '0';
+                return;
+            }
+
+            const avg = Math.round(values.reduce((a, b) => a + b, 0) / count);
+            const max = Math.max(...values);
+
+            document.getElementById('spark-avg').textContent = avg;
+            document.getElementById('spark-max').textContent = max;
+
+            const width = 500;
+            const height = 160;
+            const padding = 10;
+            const usableW = width - padding * 2;
+            const usableH = height - padding * 2;
+            const denom = Math.max(1, count - 1);
+
+            const points = values.map((v, i) => {
+                const x = padding + (i / denom) * usableW;
+                const y = height - padding - (v / 100) * usableH;
+                return [x, y];
+            });
+
+            const lineD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
+            const areaD = `${lineD} L ${points[points.length - 1][0]} ${height - padding} L ${points[0][0]} ${height - padding} Z`;
+
+            svgLine.setAttribute('d', lineD);
+            svgArea.setAttribute('d', areaD);
+        }
+
         async function loadStats() {
             const response = await fetch('/security/stats');
             const data = await response.json();
@@ -160,54 +1004,154 @@
             document.getElementById('blocked-events').textContent = data.blocked_events;
             document.getElementById('allowed-events').textContent = data.allowed_events;
             document.getElementById('high-risk-events').textContent = data.high_risk_events;
+
+            setBars(
+                data.total_events,
+                data.blocked_events,
+                data.allowed_events,
+                data.high_risk_events
+            );
+
+            updateThreatMeter(
+                data.total_events,
+                data.blocked_events,
+                data.high_risk_events
+            );
         }
 
         async function loadEvents() {
             const response = await fetch('/events');
             const data = await response.json();
 
+            latestEvents = data;
+            updateSparkline(latestEvents);
+
             const tbody = document.getElementById('events-body');
             tbody.innerHTML = '';
+
+            if (!data.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="muted">No events recorded yet.</td>
+                    </tr>
+                `;
+                return;
+            }
 
             data.forEach(event => {
                 const row = document.createElement('tr');
 
-                const eventTypeClass =
+                const eventClass =
                     event.event_type === 'PROMPT_BLOCKED' || event.event_type === 'TOOL_BLOCKED'
-                    ? 'blocked'
-                    : 'allowed';
+                    ? 'event-type event-blocked'
+                    : 'event-type event-allowed';
 
                 row.innerHTML = `
                     <td>${event.id}</td>
                     <td>${event.timestamp || ''}</td>
-                    <td class="${eventTypeClass}">${event.event_type}</td>
+                    <td class="${eventClass}">${event.event_type}</td>
                     <td>${event.tool || ''}</td>
                     <td>${event.risk ?? ''}</td>
-                    <td>${event.goal || ''}</td>
+                    <td class="goal-cell">${event.goal || ''}</td>
                 `;
 
                 tbody.appendChild(row);
             });
         }
 
+        function badgeClass(status) {
+            if (status === 'blocked') return 'badge badge-blocked';
+            if (status === 'ok') return 'badge badge-allowed';
+            return 'badge badge-error';
+        }
+
+        function badgeText(status) {
+            if (status === 'ok') return 'ALLOWED';
+            if (status === 'blocked') return 'BLOCKED';
+            return 'ERROR';
+        }
+
         async function runRedTeam() {
-            const output = document.getElementById('red-team-output');
-            output.textContent = 'Running red-team test...';
+            const resultsList = document.getElementById('results-list');
+            resultsList.innerHTML = '<div class="empty-state">Running red-team simulation...</div>';
 
             const response = await fetch('/security/red-team-test', {
                 method: 'POST'
             });
 
             const data = await response.json();
-            output.textContent = JSON.stringify(data, null, 2);
 
+            document.getElementById('rt-total').textContent = data.summary.total_tests;
+            document.getElementById('rt-blocked').textContent = data.summary.blocked;
+            document.getElementById('rt-allowed').textContent = data.summary.allowed;
+
+            resultsList.innerHTML = '';
+
+            data.results.forEach(item => {
+                const result = item.result || {};
+                const card = document.createElement('div');
+                card.className = 'result-card tilt-card';
+
+                card.innerHTML = `
+                    <h4>${item.prompt}</h4>
+                    <div class="meta">
+                        <span class="${badgeClass(result.status)}">${badgeText(result.status)}</span>
+                        <span class="badge badge-risk">Risk: ${result.risk ?? 0}</span>
+                        <span class="badge badge-risk">Tool: ${result.tool ?? 'N/A'}</span>
+                    </div>
+                    <div class="reason"><strong>Reason:</strong> ${result.reason ?? 'Executed successfully'}</div>
+                `;
+
+                resultsList.appendChild(card);
+            });
+
+            applyTiltEffects();
             await loadStats();
             await loadEvents();
+            updateTimestamp();
+        }
+
+        async function refreshAll() {
+            await loadStats();
+            await loadEvents();
+            updateTimestamp();
+        }
+
+        function applyTiltEffects() {
+            const cards = document.querySelectorAll('.tilt-card');
+
+            cards.forEach(card => {
+                if (card.dataset.tiltBound === 'yes') return;
+                card.dataset.tiltBound = 'yes';
+
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+
+                    const rotateX = ((y - centerY) / centerY) * -3.2;
+                    const rotateY = ((x - centerX) / centerX) * 3.8;
+
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
+
+                    card.style.setProperty('--mx', `${x}px`);
+                    card.style.setProperty('--my', `${y}px`);
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = '';
+                    card.style.setProperty('--mx', '50%');
+                    card.style.setProperty('--my', '50%');
+                });
+            });
         }
 
         async function initDashboard() {
-            await loadStats();
-            await loadEvents();
+            await refreshAll();
+            applyTiltEffects();
         }
 
         initDashboard();
