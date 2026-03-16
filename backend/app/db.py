@@ -24,6 +24,7 @@ class SecurityEvent(Base):
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
     event_type = Column(String)
+    severity = Column(String)
     tool = Column(String)
     reason = Column(String)
     risk = Column(Integer)
