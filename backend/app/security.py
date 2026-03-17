@@ -9,9 +9,11 @@ POLICY_PATH = BASE_DIR / "policies" / "default_policy.yaml"
 try:
     with open(POLICY_PATH, "r", encoding="utf-8") as f:
         POLICY = yaml.safe_load(f) or {}
+    POLICY_LOADED = True
 except Exception as e:
     print("Failed to load policy file:", e)
     POLICY = {}
+    POLICY_LOADED = False
 
 INJECTION_PATTERNS = POLICY.get("blocked_patterns", [
     "ignore previous instructions",
@@ -37,6 +39,16 @@ RISK_SCORES = POLICY.get("risk_scores", {
 })
 
 
+def severity_from_risk(risk: int) -> str:
+    if risk >= 85:
+        return "critical"
+    if risk >= 60:
+        return "high"
+    if risk >= 30:
+        return "medium"
+    return "low"
+
+
 def risk_score(text: str) -> int:
     t = (text or "").lower()
     score = 0
@@ -50,12 +62,23 @@ def risk_score(text: str) -> int:
     return min(score, 100)
 
 
-def log_event(event_type: str, goal: str, tool: str = "", reason: str = "", risk: int = 0):
+def log_event(
+    event_type: str,
+    goal: str,
+    tool: str = "",
+    reason: str = "",
+    risk: int = 0,
+    app_id: str = "default-app"
+):
+    severity = severity_from_risk(risk)
+
     db = SessionLocal()
     try:
         db.add(
             SecurityEvent(
+                app_id=app_id,
                 event_type=event_type,
+                severity=severity,
                 tool=tool,
                 reason=reason,
                 risk=risk,
@@ -77,3 +100,15 @@ def allow_tool_call(goal: str, tool_name: str):
         return False, "High-risk goal detected", r
 
     return True, "Allowed", r
+
+
+def get_policy_status():
+    return {
+        "policy_loaded": POLICY_LOADED,
+        "policy_path": str(POLICY_PATH),
+        "blocked_patterns_count": len(INJECTION_PATTERNS),
+        "exfiltration_patterns_count": len(EXFIL_PATTERNS),
+        "allowed_tools": sorted(list(ALLOWED_TOOLS)),
+        "block_threshold": BLOCK_THRESHOLD,
+        "risk_scores": RISK_SCORES,
+    }

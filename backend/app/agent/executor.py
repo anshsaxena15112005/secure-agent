@@ -2,21 +2,11 @@ from backend.app.tools import TOOLS
 from backend.app.security import allow_tool_call, log_event
 
 
-def execute_plan(plan: dict):
-    """
-    Phase 2 executor:
-    - reads structured plan
-    - checks security
-    - finds tool from registry
-    - executes tool
-    - logs result
-    """
-
+def execute_plan(plan: dict, app_id: str = "default-app"):
     goal = plan["goal"]
     tool_name = plan["tool"]
     tool_input = plan["tool_input"]
 
-    # 1. Security check before execution
     allowed, reason, risk = allow_tool_call(goal, tool_name)
 
     if not allowed:
@@ -25,18 +15,20 @@ def execute_plan(plan: dict):
             goal=goal,
             tool=tool_name,
             reason=reason,
-            risk=risk
+            risk=risk,
+            app_id=app_id
         )
         return {
             "status": "blocked",
+            "app_id": app_id,
             "goal": goal,
             "tool": tool_name,
             "reason": reason,
             "risk": risk,
+            "severity": "critical" if risk >= 85 else "high" if risk >= 60 else "medium",
             "steps": plan.get("steps", [])
         }
 
-    # 2. Tool lookup from registry
     tool_func = TOOLS.get(tool_name)
 
     if tool_func is None:
@@ -45,35 +37,39 @@ def execute_plan(plan: dict):
             goal=goal,
             tool=tool_name,
             reason="Unknown tool requested",
-            risk=80
+            risk=80,
+            app_id=app_id
         )
         return {
             "status": "error",
+            "app_id": app_id,
             "goal": goal,
             "tool": tool_name,
             "reason": "Unknown tool requested",
             "risk": 80,
+            "severity": "high",
             "steps": plan.get("steps", [])
         }
 
-    # 3. Execute tool
     output = tool_func(tool_input)
 
-    # 4. Log success
     log_event(
         event_type="TOOL_OK",
         goal=goal,
         tool=tool_name,
         reason="Executed successfully",
-        risk=0
+        risk=0,
+        app_id=app_id
     )
 
     return {
         "status": "ok",
+        "app_id": app_id,
         "goal": goal,
         "intent": plan.get("intent"),
         "tool": tool_name,
         "tool_input": tool_input,
         "steps": plan.get("steps", []),
+        "severity": "low",
         "output": output
     }
