@@ -30,13 +30,13 @@ jobs:
 
       - name: Verify imports
         run: |
-          python -c "import backend; print('backend import ok')"
-          python -c "import backend.app.main; print('main import ok')"
+          PYTHONPATH=. python -c "import backend; print('backend import ok')"
+          PYTHONPATH=. python -c "import backend.app.main; print('main import ok')"
 
       - name: Run red-team test suite
         run: |
-          python -m tests.run_red_team_cases
+          PYTHONPATH=. python -m tests.run_red_team_cases
 
       - name: Run pytest
         run: |
-          pytest -q
+          PYTHONPATH=. pytest -q
