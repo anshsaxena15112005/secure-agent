@@ -11,12 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
 
       - name: Install dependencies
         run: |
@@ -24,5 +28,15 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest
 
-      - name: Run tests
-        run: pytest -q
+      - name: Verify imports
+        run: |
+          python -c "import backend; print('backend import ok')"
+          python -c "import backend.app.main; print('main import ok')"
+
+      - name: Run red-team test suite
+        run: |
+          python -m tests.run_red_team_cases
+
+      - name: Run pytest
+        run: |
+          pytest -q
