@@ -24,6 +24,7 @@ class SecurityEvent(Base):
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
     app_id = Column(String, default="default-app")
+    role = Column(String, default="user")
     event_type = Column(String)
     severity = Column(String)
     tool = Column(String)
