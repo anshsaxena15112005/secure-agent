@@ -30,12 +30,15 @@ EXFIL_PATTERNS = POLICY.get("exfiltration_patterns", [
 ])
 
 ALLOWED_TOOLS = set(POLICY.get("allowed_tools", ["calculator", "notes_store"]))
+ROLE_CONFIG = POLICY.get("roles", {})
+
 BLOCK_THRESHOLD = POLICY.get("block_threshold", 60)
 
 RISK_SCORES = POLICY.get("risk_scores", {
     "prompt_injection": 60,
     "exfiltration": 60,
     "tool_abuse": 80,
+    "role_violation": 70,
 })
 
 
@@ -62,13 +65,20 @@ def risk_score(text: str) -> int:
     return min(score, 100)
 
 
+def is_tool_allowed_for_role(role: str, tool_name: str) -> bool:
+    role_policy = ROLE_CONFIG.get(role, {})
+    allowed_tools = set(role_policy.get("allowed_tools", []))
+    return tool_name in allowed_tools
+
+
 def log_event(
     event_type: str,
     goal: str,
     tool: str = "",
     reason: str = "",
     risk: int = 0,
-    app_id: str = "default-app"
+    app_id: str = "default-app",
+    role: str = "user",
 ):
     severity = severity_from_risk(risk)
 
@@ -77,6 +87,7 @@ def log_event(
         db.add(
             SecurityEvent(
                 app_id=app_id,
+                role=role,
                 event_type=event_type,
                 severity=severity,
                 tool=tool,
@@ -90,12 +101,17 @@ def log_event(
         db.close()
 
 
-def allow_tool_call(goal: str, tool_name: str):
+def allow_tool_call(goal: str, tool_name: str, role: str = "user"):
+    # global allowlist
     if tool_name not in ALLOWED_TOOLS:
-        return False, "Tool not allowlisted", RISK_SCORES.get("tool_abuse", 80)
+        return False, "Tool not allowlisted globally", RISK_SCORES.get("tool_abuse", 80)
 
+    # role-based allowlist
+    if not is_tool_allowed_for_role(role, tool_name):
+        return False, f"Role '{role}' is not permitted to use tool '{tool_name}'", RISK_SCORES.get("role_violation", 70)
+
+    # prompt risk
     r = risk_score(goal)
-
     if r >= BLOCK_THRESHOLD:
         return False, "High-risk goal detected", r
 
@@ -109,6 +125,7 @@ def get_policy_status():
         "blocked_patterns_count": len(INJECTION_PATTERNS),
         "exfiltration_patterns_count": len(EXFIL_PATTERNS),
         "allowed_tools": sorted(list(ALLOWED_TOOLS)),
+        "roles": ROLE_CONFIG,
         "block_threshold": BLOCK_THRESHOLD,
         "risk_scores": RISK_SCORES,
     }
