@@ -15,9 +15,23 @@ allowed_tools:
   - calculator
   - notes_store
 
+roles:
+  user:
+    allowed_tools:
+      - calculator
+
+  admin:
+    allowed_tools:
+      - calculator
+      - notes_store
+
+  auditor:
+    allowed_tools: []
+
 block_threshold: 60
 
 risk_scores:
   prompt_injection: 60
   exfiltration: 60
   tool_abuse: 80
+  role_violation: 70
