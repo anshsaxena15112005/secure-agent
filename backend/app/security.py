@@ -1,7 +1,7 @@
 from pathlib import Path
 import yaml
 
-from backend.app.db import SessionLocal, SecurityEvent
+from backend.app.db import SessionLocal, SecurityEvent, Incident
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 POLICY_PATH = BASE_DIR / "policies" / "default_policy.yaml"
@@ -71,6 +71,41 @@ def is_tool_allowed_for_role(role: str, tool_name: str) -> bool:
     return tool_name in allowed_tools
 
 
+def create_incident_if_needed(
+    app_id: str,
+    role: str,
+    event_type: str,
+    severity: str,
+    tool: str,
+    reason: str,
+    risk: int,
+    goal: str,
+):
+    if severity not in {"high", "critical"}:
+        return
+
+    if event_type not in {"PROMPT_BLOCKED", "TOOL_BLOCKED"}:
+        return
+
+    db = SessionLocal()
+    try:
+        incident = Incident(
+            app_id=app_id,
+            role=role,
+            event_type=event_type,
+            severity=severity,
+            tool=tool,
+            reason=reason,
+            risk=risk,
+            goal=goal,
+            status="open",
+        )
+        db.add(incident)
+        db.commit()
+    finally:
+        db.close()
+
+
 def log_event(
     event_type: str,
     goal: str,
@@ -100,17 +135,25 @@ def log_event(
     finally:
         db.close()
 
+    create_incident_if_needed(
+        app_id=app_id,
+        role=role,
+        event_type=event_type,
+        severity=severity,
+        tool=tool,
+        reason=reason,
+        risk=risk,
+        goal=goal,
+    )
+
 
 def allow_tool_call(goal: str, tool_name: str, role: str = "user"):
-    # global allowlist
     if tool_name not in ALLOWED_TOOLS:
         return False, "Tool not allowlisted globally", RISK_SCORES.get("tool_abuse", 80)
 
-    # role-based allowlist
     if not is_tool_allowed_for_role(role, tool_name):
         return False, f"Role '{role}' is not permitted to use tool '{tool_name}'", RISK_SCORES.get("role_violation", 70)
 
-    # prompt risk
     r = risk_score(goal)
     if r >= BLOCK_THRESHOLD:
         return False, "High-risk goal detected", r

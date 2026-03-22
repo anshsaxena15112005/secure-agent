@@ -1,11 +1,11 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from backend.app.db import init_db, SessionLocal, SecurityEvent
+from backend.app.db import init_db, SessionLocal, SecurityEvent, Incident
 from backend.app.agent.planner import plan_task
 from backend.app.agent.executor import execute_plan
 from backend.app.security import get_policy_status
@@ -13,7 +13,7 @@ from backend.app.security import get_policy_status
 app = FastAPI(
     title="SecureAgent",
     description="Backend-first AI agent security platform",
-    version="6.0"
+    version="7.0"
 )
 
 init_db()
@@ -103,6 +103,102 @@ def get_alerts(limit: int = 25, app_id: Optional[str] = None, role: Optional[str
             }
             for row in rows
         ]
+    finally:
+        db.close()
+
+
+@app.get("/incidents")
+def get_incidents(limit: int = 50, app_id: Optional[str] = None, role: Optional[str] = None, status: Optional[str] = None):
+    db = SessionLocal()
+    try:
+        query = db.query(Incident)
+
+        if app_id:
+            query = query.filter(Incident.app_id == app_id)
+        if role:
+            query = query.filter(Incident.role == role)
+        if status:
+            query = query.filter(Incident.status == status)
+
+        rows = query.order_by(Incident.id.desc()).limit(limit).all()
+
+        return [
+            {
+                "id": row.id,
+                "timestamp": row.timestamp.isoformat() if row.timestamp else None,
+                "app_id": row.app_id,
+                "role": row.role,
+                "event_type": row.event_type,
+                "severity": row.severity,
+                "tool": row.tool,
+                "reason": row.reason,
+                "risk": row.risk,
+                "goal": row.goal,
+                "status": row.status,
+            }
+            for row in rows
+        ]
+    finally:
+        db.close()
+
+
+@app.get("/incidents/stats")
+def incident_stats(app_id: Optional[str] = None, role: Optional[str] = None):
+    db = SessionLocal()
+    try:
+        query = db.query(Incident)
+
+        if app_id:
+            query = query.filter(Incident.app_id == app_id)
+        if role:
+            query = query.filter(Incident.role == role)
+
+        rows = query.all()
+
+        by_status = {"open": 0, "acknowledged": 0, "resolved": 0}
+        by_severity = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+
+        for row in rows:
+            by_status[row.status] = by_status.get(row.status, 0) + 1
+            by_severity[row.severity] = by_severity.get(row.severity, 0) + 1
+
+        return {
+            "total_incidents": len(rows),
+            "by_status": by_status,
+            "by_severity": by_severity,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/incidents/{incident_id}/ack")
+def acknowledge_incident(incident_id: int):
+    db = SessionLocal()
+    try:
+        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        if not incident:
+            raise HTTPException(status_code=404, detail="Incident not found")
+
+        incident.status = "acknowledged"
+        db.commit()
+
+        return {"message": "Incident acknowledged", "incident_id": incident_id, "status": incident.status}
+    finally:
+        db.close()
+
+
+@app.post("/incidents/{incident_id}/resolve")
+def resolve_incident(incident_id: int):
+    db = SessionLocal()
+    try:
+        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        if not incident:
+            raise HTTPException(status_code=404, detail="Incident not found")
+
+        incident.status = "resolved"
+        db.commit()
+
+        return {"message": "Incident resolved", "incident_id": incident_id, "status": incident.status}
     finally:
         db.close()
 

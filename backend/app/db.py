@@ -33,5 +33,21 @@ class SecurityEvent(Base):
     goal = Column(String)
 
 
+class Incident(Base):
+    __tablename__ = "incidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    app_id = Column(String, default="default-app")
+    role = Column(String, default="user")
+    event_type = Column(String)
+    severity = Column(String)
+    tool = Column(String)
+    reason = Column(String)
+    risk = Column(Integer)
+    goal = Column(String)
+    status = Column(String, default="open")   # open, acknowledged, resolved
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
