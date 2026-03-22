@@ -279,7 +279,22 @@
             box-shadow: none;
         }
 
-        .grid-4 {
+        .btn.small {
+            padding: 7px 10px;
+            font-size: 12px;
+            border-radius: 10px;
+        }
+
+        .btn.warn {
+            background: linear-gradient(180deg, #8a7860, #6f604d);
+        }
+
+        .btn.ok {
+            background: linear-gradient(180deg, #6c8f79, #55705f);
+        }
+
+        .grid-4,
+        .grid-incident {
             display: grid;
             grid-template-columns: repeat(4, minmax(220px, 1fr));
             gap: 16px;
@@ -455,6 +470,21 @@
             color: #c8dfcf;
         }
 
+        .badge-open {
+            background: var(--red-bg);
+            color: #f0cccc;
+        }
+
+        .badge-acknowledged {
+            background: var(--amber-bg);
+            color: #eadbb9;
+        }
+
+        .badge-resolved {
+            background: var(--green-bg);
+            color: #c8dfcf;
+        }
+
         .list {
             display: grid;
             gap: 10px;
@@ -580,19 +610,28 @@
             flex-wrap: wrap;
         }
 
+        .incident-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
         @media (max-width: 1200px) {
             .analysis-grid,
             .layout {
                 grid-template-columns: 1fr;
             }
 
-            .grid-4 {
+            .grid-4,
+            .grid-incident {
                 grid-template-columns: repeat(2, minmax(220px, 1fr));
             }
         }
 
         @media (max-width: 760px) {
             .grid-4,
+            .grid-incident,
             .mini-grid {
                 grid-template-columns: 1fr;
             }
@@ -626,7 +665,7 @@
         <div class="topbar tilt-card">
             <div class="title-wrap">
                 <h1>SecureAgent Platform Console</h1>
-                <p>Multi-application runtime monitoring, policy enforcement, and security analytics</p>
+                <p>Multi-application runtime monitoring, policy enforcement, incident response, and security analytics</p>
             </div>
 
             <div class="topbar-meta">
@@ -665,6 +704,29 @@
                 <h3>High Risk Events</h3>
                 <p id="high-risk-events">0</p>
                 <div class="sub">Events with risk score ≥ 60</div>
+            </div>
+        </div>
+
+        <div class="grid-incident">
+            <div class="card tilt-card">
+                <h3>Open Incidents</h3>
+                <p id="inc-open">0</p>
+                <div class="sub">Incidents requiring action</div>
+            </div>
+            <div class="card tilt-card">
+                <h3>Acknowledged</h3>
+                <p id="inc-ack">0</p>
+                <div class="sub">Incidents under review</div>
+            </div>
+            <div class="card tilt-card">
+                <h3>Resolved</h3>
+                <p id="inc-resolved">0</p>
+                <div class="sub">Closed incidents</div>
+            </div>
+            <div class="card tilt-card">
+                <h3>Total Incidents</h3>
+                <p id="inc-total">0</p>
+                <div class="sub">All incidents for the selected scope</div>
             </div>
         </div>
 
@@ -715,6 +777,18 @@
 
             <div class="panel tilt-card">
                 <div class="panel-header">
+                    <h2 class="panel-title">Incident Status Distribution</h2>
+                    <div class="panel-subtitle">Operational incident lifecycle by status</div>
+                </div>
+                <div class="panel-body">
+                    <div class="bar-group" id="incident-status-bars"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="panel tilt-card">
+                <div class="panel-header">
                     <h2 class="panel-title">Red-Team Simulation</h2>
                     <div class="panel-subtitle">Run simulation against the selected app context</div>
                 </div>
@@ -743,6 +817,16 @@
                     <div id="rt-results" class="list" style="margin-top:12px;"></div>
                 </div>
             </div>
+
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">Recent Incidents</h2>
+                    <div class="panel-subtitle">Open, acknowledged, and resolved incidents</div>
+                </div>
+                <div class="panel-body">
+                    <div id="incidents-list" class="list"></div>
+                </div>
+            </div>
         </div>
 
         <div class="panel tilt-card">
@@ -758,6 +842,7 @@
                                 <th>ID</th>
                                 <th>Timestamp</th>
                                 <th>App</th>
+                                <th>Role</th>
                                 <th>Type</th>
                                 <th>Severity</th>
                                 <th>Tool</th>
@@ -790,6 +875,11 @@
         function severityBadge(sev) {
             const safe = sev || "low";
             return `<span class="badge badge-${safe}">${safe.toUpperCase()}</span>`;
+        }
+
+        function incidentStatusBadge(status) {
+            const s = status || "open";
+            return `<span class="badge badge-${s}">${s.toUpperCase()}</span>`;
         }
 
         function renderBars(containerId, dataMap) {
@@ -833,6 +923,18 @@
             renderBars("tool-bars", data.by_tool || {});
         }
 
+        async function loadIncidentStats() {
+            const response = await fetch(`/incidents/stats${qsForApp()}`);
+            const data = await response.json();
+
+            document.getElementById("inc-total").textContent = data.total_incidents || 0;
+            document.getElementById("inc-open").textContent = (data.by_status || {}).open || 0;
+            document.getElementById("inc-ack").textContent = (data.by_status || {}).acknowledged || 0;
+            document.getElementById("inc-resolved").textContent = (data.by_status || {}).resolved || 0;
+
+            renderBars("incident-status-bars", data.by_status || {});
+        }
+
         async function loadEvents() {
             const response = await fetch(`/events${qsForApp()}`);
             const data = await response.json();
@@ -841,7 +943,7 @@
             tbody.innerHTML = "";
 
             if (!data.length) {
-                tbody.innerHTML = `<tr><td colspan="8" class="muted">No events found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="muted">No events found.</td></tr>`;
                 return;
             }
 
@@ -851,6 +953,7 @@
                     <td>${event.id}</td>
                     <td>${event.timestamp || ""}</td>
                     <td>${event.app_id || ""}</td>
+                    <td>${event.role || ""}</td>
                     <td>${event.event_type || ""}</td>
                     <td>${severityBadge(event.severity)}</td>
                     <td>${event.tool || ""}</td>
@@ -879,7 +982,7 @@
                 item.innerHTML = `
                     <h4>${alert.event_type} · ${alert.app_id || "default-app"}</h4>
                     <div style="margin-bottom:8px;">${severityBadge(alert.severity)}</div>
-                    <div class="muted"><strong>Tool:</strong> ${alert.tool || "N/A"} · <strong>Risk:</strong> ${alert.risk ?? 0}</div>
+                    <div class="muted"><strong>Role:</strong> ${alert.role || "user"} · <strong>Tool:</strong> ${alert.tool || "N/A"} · <strong>Risk:</strong> ${alert.risk ?? 0}</div>
                     <div class="muted"><strong>Reason:</strong> ${alert.reason || "N/A"}</div>
                     <div class="muted"><strong>Goal:</strong> ${alert.goal || ""}</div>
                 `;
@@ -899,6 +1002,49 @@
                 <div class="kv-row"><span>Allowed Tools</span><span>${(data.allowed_tools || []).join(", ")}</span></div>
                 <div class="kv-row"><span>Block Threshold</span><span>${data.block_threshold}</span></div>
             `;
+        }
+
+        async function loadIncidents() {
+            const response = await fetch(`/incidents${qsForApp()}`);
+            const data = await response.json();
+
+            const container = document.getElementById("incidents-list");
+            container.innerHTML = "";
+
+            if (!data.length) {
+                container.innerHTML = `<div class="muted">No incidents found.</div>`;
+                return;
+            }
+
+            data.forEach(incident => {
+                const item = document.createElement("div");
+                item.className = "list-item tilt-card";
+                item.innerHTML = `
+                    <h4>Incident #${incident.id} · ${incident.app_id || "default-app"}</h4>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                        ${severityBadge(incident.severity)}
+                        ${incidentStatusBadge(incident.status)}
+                    </div>
+                    <div class="muted"><strong>Role:</strong> ${incident.role || "user"} · <strong>Tool:</strong> ${incident.tool || "N/A"} · <strong>Risk:</strong> ${incident.risk ?? 0}</div>
+                    <div class="muted"><strong>Reason:</strong> ${incident.reason || "N/A"}</div>
+                    <div class="muted"><strong>Goal:</strong> ${incident.goal || ""}</div>
+                    <div class="incident-actions">
+                        <button class="btn small warn" onclick="ackIncident(${incident.id})">Acknowledge</button>
+                        <button class="btn small ok" onclick="resolveIncident(${incident.id})">Resolve</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        async function ackIncident(id) {
+            await fetch(`/incidents/${id}/ack`, { method: "POST" });
+            await refreshAll();
+        }
+
+        async function resolveIncident(id) {
+            await fetch(`/incidents/${id}/resolve`, { method: "POST" });
+            await refreshAll();
         }
 
         async function runRedTeam() {
@@ -938,9 +1084,11 @@
 
         async function refreshAll() {
             await loadStats();
+            await loadIncidentStats();
             await loadEvents();
             await loadAlerts();
             await loadPolicyStatus();
+            await loadIncidents();
             updateTimestamp();
         }
 
