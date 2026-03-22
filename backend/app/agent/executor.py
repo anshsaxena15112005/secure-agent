@@ -2,12 +2,12 @@ from backend.app.tools import TOOLS
 from backend.app.security import allow_tool_call, log_event
 
 
-def execute_plan(plan: dict, app_id: str = "default-app"):
+def execute_plan(plan: dict, app_id: str = "default-app", role: str = "user"):
     goal = plan["goal"]
     tool_name = plan["tool"]
     tool_input = plan["tool_input"]
 
-    allowed, reason, risk = allow_tool_call(goal, tool_name)
+    allowed, reason, risk = allow_tool_call(goal, tool_name, role=role)
 
     if not allowed:
         log_event(
@@ -16,11 +16,13 @@ def execute_plan(plan: dict, app_id: str = "default-app"):
             tool=tool_name,
             reason=reason,
             risk=risk,
-            app_id=app_id
+            app_id=app_id,
+            role=role
         )
         return {
             "status": "blocked",
             "app_id": app_id,
+            "role": role,
             "goal": goal,
             "tool": tool_name,
             "reason": reason,
@@ -38,11 +40,13 @@ def execute_plan(plan: dict, app_id: str = "default-app"):
             tool=tool_name,
             reason="Unknown tool requested",
             risk=80,
-            app_id=app_id
+            app_id=app_id,
+            role=role
         )
         return {
             "status": "error",
             "app_id": app_id,
+            "role": role,
             "goal": goal,
             "tool": tool_name,
             "reason": "Unknown tool requested",
@@ -59,12 +63,14 @@ def execute_plan(plan: dict, app_id: str = "default-app"):
         tool=tool_name,
         reason="Executed successfully",
         risk=0,
-        app_id=app_id
+        app_id=app_id,
+        role=role
     )
 
     return {
         "status": "ok",
         "app_id": app_id,
+        "role": role,
         "goal": goal,
         "intent": plan.get("intent"),
         "tool": tool_name,
