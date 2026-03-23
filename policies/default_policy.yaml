@@ -11,6 +11,17 @@ exfiltration_patterns:
   - token
   - secret
 
+output_sensitive_patterns:
+  - api key
+  - password
+  - secret
+  - token
+  - sk-
+  - bearer
+  - private key
+
+output_action: redact
+
 allowed_tools:
   - calculator
   - notes_store
@@ -35,3 +46,4 @@ risk_scores:
   exfiltration: 60
   tool_abuse: 80
   role_violation: 70
+  output_leakage: 75
