@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import yaml
 
 from backend.app.db import SessionLocal, SecurityEvent, Incident
@@ -29,6 +30,18 @@ EXFIL_PATTERNS = POLICY.get("exfiltration_patterns", [
     "secret",
 ])
 
+OUTPUT_SENSITIVE_PATTERNS = POLICY.get("output_sensitive_patterns", [
+    "api key",
+    "password",
+    "secret",
+    "token",
+    "sk-",
+    "bearer",
+    "private key",
+])
+
+OUTPUT_ACTION = POLICY.get("output_action", "redact")
+
 ALLOWED_TOOLS = set(POLICY.get("allowed_tools", ["calculator", "notes_store"]))
 ROLE_CONFIG = POLICY.get("roles", {})
 
@@ -39,6 +52,7 @@ RISK_SCORES = POLICY.get("risk_scores", {
     "exfiltration": 60,
     "tool_abuse": 80,
     "role_violation": 70,
+    "output_leakage": 75,
 })
 
 
@@ -84,7 +98,7 @@ def create_incident_if_needed(
     if severity not in {"high", "critical"}:
         return
 
-    if event_type not in {"PROMPT_BLOCKED", "TOOL_BLOCKED"}:
+    if event_type not in {"PROMPT_BLOCKED", "TOOL_BLOCKED", "OUTPUT_BLOCKED", "OUTPUT_REDACTED"}:
         return
 
     db = SessionLocal()
@@ -161,12 +175,77 @@ def allow_tool_call(goal: str, tool_name: str, role: str = "user"):
     return True, "Allowed", r
 
 
+def inspect_output(output, app_id: str, role: str, tool: str, goal: str):
+    """
+    Returns:
+      {
+        "status": "safe" | "redacted" | "blocked",
+        "output": ...,
+        "reason": "...",
+        "risk": int
+      }
+    """
+    output_text = str(output).lower()
+
+    matched = [p for p in OUTPUT_SENSITIVE_PATTERNS if p in output_text]
+    if not matched:
+        return {
+            "status": "safe",
+            "output": output,
+            "reason": "Output passed inspection",
+            "risk": 0,
+        }
+
+    risk = RISK_SCORES.get("output_leakage", 75)
+    reason = f"Sensitive output detected: {', '.join(matched)}"
+
+    if OUTPUT_ACTION == "block":
+        log_event(
+            event_type="OUTPUT_BLOCKED",
+            goal=goal,
+            tool=tool,
+            reason=reason,
+            risk=risk,
+            app_id=app_id,
+            role=role,
+        )
+        return {
+            "status": "blocked",
+            "output": "[BLOCKED: sensitive output detected]",
+            "reason": reason,
+            "risk": risk,
+        }
+
+    redacted = str(output)
+    for pattern in matched:
+        redacted = re.sub(re.escape(pattern), "[REDACTED]", redacted, flags=re.IGNORECASE)
+
+    log_event(
+        event_type="OUTPUT_REDACTED",
+        goal=goal,
+        tool=tool,
+        reason=reason,
+        risk=risk,
+        app_id=app_id,
+        role=role,
+    )
+
+    return {
+        "status": "redacted",
+        "output": redacted,
+        "reason": reason,
+        "risk": risk,
+    }
+
+
 def get_policy_status():
     return {
         "policy_loaded": POLICY_LOADED,
         "policy_path": str(POLICY_PATH),
         "blocked_patterns_count": len(INJECTION_PATTERNS),
         "exfiltration_patterns_count": len(EXFIL_PATTERNS),
+        "output_sensitive_patterns_count": len(OUTPUT_SENSITIVE_PATTERNS),
+        "output_action": OUTPUT_ACTION,
         "allowed_tools": sorted(list(ALLOWED_TOOLS)),
         "roles": ROLE_CONFIG,
         "block_threshold": BLOCK_THRESHOLD,
