@@ -25,6 +25,7 @@ output_action: redact
 allowed_tools:
   - calculator
   - notes_store
+  - demo_leak
 
 roles:
   user:
@@ -35,6 +36,7 @@ roles:
     allowed_tools:
       - calculator
       - notes_store
+      - demo_leak
 
   auditor:
     allowed_tools: []

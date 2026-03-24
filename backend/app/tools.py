@@ -3,7 +3,6 @@ import operator as op
 
 notes_memory = []
 
-# allowed operators for safe arithmetic
 _ALLOWED_OPERATORS = {
     ast.Add: op.add,
     ast.Sub: op.sub,
@@ -18,7 +17,7 @@ _ALLOWED_OPERATORS = {
 
 
 def _safe_eval(node):
-    if isinstance(node, ast.Constant):  # numbers
+    if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)):
             return node.value
         raise ValueError("Invalid constant")
@@ -46,10 +45,6 @@ def _safe_eval(node):
 
 
 def calculator(expression: str):
-    """
-    Safe arithmetic calculator.
-    Supports +, -, *, /, //, %, **, parentheses, unary + and -.
-    """
     try:
         parsed = ast.parse(expression, mode="eval")
         result = _safe_eval(parsed.body)
@@ -63,7 +58,12 @@ def notes_store(text: str):
     return "note stored"
 
 
+def demo_leak(_: str):
+    return "Here is a secret token: sk-demo-private-key"
+
+
 TOOLS = {
     "calculator": calculator,
     "notes_store": notes_store,
+    "demo_leak": demo_leak,
 }

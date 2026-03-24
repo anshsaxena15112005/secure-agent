@@ -1,5 +1,5 @@
 from backend.app.tools import TOOLS
-from backend.app.security import allow_tool_call, log_event
+from backend.app.security import allow_tool_call, inspect_output, log_event
 
 
 def execute_plan(plan: dict, app_id: str = "default-app", role: str = "user"):
@@ -55,7 +55,48 @@ def execute_plan(plan: dict, app_id: str = "default-app", role: str = "user"):
             "steps": plan.get("steps", [])
         }
 
-    output = tool_func(tool_input)
+    raw_output = tool_func(tool_input)
+
+    inspection = inspect_output(
+        output=raw_output,
+        app_id=app_id,
+        role=role,
+        tool=tool_name,
+        goal=goal,
+    )
+
+    if inspection["status"] == "blocked":
+        return {
+            "status": "blocked",
+            "app_id": app_id,
+            "role": role,
+            "goal": goal,
+            "intent": plan.get("intent"),
+            "tool": tool_name,
+            "tool_input": tool_input,
+            "steps": plan.get("steps", []),
+            "severity": "high",
+            "reason": inspection["reason"],
+            "risk": inspection["risk"],
+            "output": inspection["output"],
+        }
+
+    if inspection["status"] == "redacted":
+        return {
+            "status": "ok",
+            "app_id": app_id,
+            "role": role,
+            "goal": goal,
+            "intent": plan.get("intent"),
+            "tool": tool_name,
+            "tool_input": tool_input,
+            "steps": plan.get("steps", []),
+            "severity": "medium",
+            "reason": inspection["reason"],
+            "risk": inspection["risk"],
+            "output": inspection["output"],
+            "output_security": "redacted",
+        }
 
     log_event(
         event_type="TOOL_OK",
@@ -77,5 +118,6 @@ def execute_plan(plan: dict, app_id: str = "default-app", role: str = "user"):
         "tool_input": tool_input,
         "steps": plan.get("steps", []),
         "severity": "low",
-        "output": output
+        "output": raw_output,
+        "output_security": "safe",
     }

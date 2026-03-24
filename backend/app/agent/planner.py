@@ -1,13 +1,7 @@
 def plan_task(goal: str):
-    """
-    Phase 2 planner:
-    Converts a user goal into a structured execution plan.
-    """
-
     cleaned_goal = goal.strip()
     lowered_goal = cleaned_goal.lower()
 
-    # Default plan structure
     plan = {
         "goal": cleaned_goal,
         "intent": "unknown",
@@ -16,7 +10,17 @@ def plan_task(goal: str):
         "steps": []
     }
 
-    # Intent: calculation
+    if "demo leak" in lowered_goal:
+        plan["intent"] = "output_security_test"
+        plan["tool"] = "demo_leak"
+        plan["tool_input"] = cleaned_goal
+        plan["steps"] = [
+            "identify output security test request",
+            "select demo_leak tool",
+            "execute output inspection workflow"
+        ]
+        return plan
+
     if "calculate" in lowered_goal or any(op in cleaned_goal for op in ["+", "-", "*", "/"]):
         expression = cleaned_goal.replace("calculate", "").strip()
 
@@ -30,7 +34,6 @@ def plan_task(goal: str):
         ]
         return plan
 
-    # Intent: note storage
     if "note" in lowered_goal or "remember" in lowered_goal or "save" in lowered_goal:
         plan["intent"] = "note_storage"
         plan["tool"] = "notes_store"
@@ -42,7 +45,6 @@ def plan_task(goal: str):
         ]
         return plan
 
-    # Fallback
     plan["intent"] = "default"
     plan["tool"] = "notes_store"
     plan["tool_input"] = cleaned_goal
