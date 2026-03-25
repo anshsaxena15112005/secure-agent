@@ -46,7 +46,17 @@ class Incident(Base):
     reason = Column(String)
     risk = Column(Integer)
     goal = Column(String)
-    status = Column(String, default="open")   # open, acknowledged, resolved
+    status = Column(String, default="open")
+
+
+class PlatformUser(Base):
+    __tablename__ = "platform_users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    role = Column(String, default="analyst")   # admin, analyst, auditor
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 def init_db():
