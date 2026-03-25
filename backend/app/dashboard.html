@@ -23,29 +23,17 @@
             --accent-2: #55717b;
             --accent-soft: #87aab2;
             --teal: #6ea29d;
-            --teal-soft: rgba(110, 162, 157, 0.18);
 
-            --green: #7da48a;
             --green-bg: rgba(125, 164, 138, 0.14);
-
-            --red: #b88484;
             --red-bg: rgba(184, 132, 132, 0.14);
-
-            --amber: #b29a74;
             --amber-bg: rgba(178, 154, 116, 0.14);
-
             --blue-bg: rgba(126, 155, 170, 0.12);
 
             --shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
-            --radius: 20px;
         }
 
         * {
             box-sizing: border-box;
-        }
-
-        html {
-            scroll-behavior: smooth;
         }
 
         body {
@@ -265,6 +253,10 @@
             font-size: 14px;
             transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
             box-shadow: 0 10px 22px rgba(0,0,0,0.16);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn:hover {
@@ -294,7 +286,8 @@
         }
 
         .grid-4,
-        .grid-incident {
+        .grid-incident,
+        .grid-report {
             display: grid;
             grid-template-columns: repeat(4, minmax(220px, 1fr));
             gap: 16px;
@@ -389,7 +382,8 @@
             z-index: 1;
         }
 
-        .analysis-grid {
+        .analysis-grid,
+        .report-grid {
             display: grid;
             grid-template-columns: 1.2fr 1fr;
             gap: 20px;
@@ -603,28 +597,25 @@
             color: #d9e4ef;
         }
 
-        .actions {
+        .actions,
+        .export-actions,
+        .incident-actions {
             display: flex;
             gap: 10px;
             margin-bottom: 10px;
             flex-wrap: wrap;
         }
 
-        .incident-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-
         @media (max-width: 1200px) {
             .analysis-grid,
+            .report-grid,
             .layout {
                 grid-template-columns: 1fr;
             }
 
             .grid-4,
-            .grid-incident {
+            .grid-incident,
+            .grid-report {
                 grid-template-columns: repeat(2, minmax(220px, 1fr));
             }
         }
@@ -632,6 +623,7 @@
         @media (max-width: 760px) {
             .grid-4,
             .grid-incident,
+            .grid-report,
             .mini-grid {
                 grid-template-columns: 1fr;
             }
@@ -665,7 +657,7 @@
         <div class="topbar tilt-card">
             <div class="title-wrap">
                 <h1>SecureAgent Platform Console</h1>
-                <p>Multi-application runtime monitoring, policy enforcement, incident response, and security analytics</p>
+                <p>Multi-application runtime monitoring, incident response, reporting, and security analytics</p>
             </div>
 
             <div class="topbar-meta">
@@ -693,7 +685,7 @@
             <div class="card tilt-card">
                 <h3>Blocked Events</h3>
                 <p id="blocked-events">0</p>
-                <div class="sub">Prompt or tool executions prevented</div>
+                <div class="sub">Prompt, tool, or output blocking</div>
             </div>
             <div class="card tilt-card">
                 <h3>Allowed Events</h3>
@@ -727,6 +719,61 @@
                 <h3>Total Incidents</h3>
                 <p id="inc-total">0</p>
                 <div class="sub">All incidents for the selected scope</div>
+            </div>
+        </div>
+
+        <div class="grid-report">
+            <div class="card tilt-card">
+                <h3>Report Total Events</h3>
+                <p id="report-total-events">0</p>
+                <div class="sub">Summary report metric</div>
+            </div>
+            <div class="card tilt-card">
+                <h3>Report Blocked</h3>
+                <p id="report-blocked-events">0</p>
+                <div class="sub">Blocked in current scope</div>
+            </div>
+            <div class="card tilt-card">
+                <h3>Redacted Outputs</h3>
+                <p id="report-redacted-outputs">0</p>
+                <div class="sub">Output security actions</div>
+            </div>
+            <div class="card tilt-card">
+                <h3>Report Incidents</h3>
+                <p id="report-total-incidents">0</p>
+                <div class="sub">Incidents in report scope</div>
+            </div>
+        </div>
+
+        <div class="report-grid">
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">Security Summary Report</h2>
+                    <div class="panel-subtitle">Management-style summary for the selected scope</div>
+                </div>
+                <div class="panel-body">
+                    <div class="kv" id="report-scope-kv"></div>
+                    <div style="height:12px;"></div>
+                    <div class="bar-group" id="report-severity-bars"></div>
+                </div>
+            </div>
+
+            <div class="panel tilt-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">Exports</h2>
+                    <div class="panel-subtitle">Download evidence and operational records</div>
+                </div>
+                <div class="panel-body">
+                    <div class="export-actions">
+                        <a class="btn secondary" id="export-events-json" href="#">Events JSON</a>
+                        <a class="btn secondary" id="export-incidents-json" href="#">Incidents JSON</a>
+                        <a class="btn secondary" id="export-events-csv" href="#">Events CSV</a>
+                        <a class="btn secondary" id="export-incidents-csv" href="#">Incidents CSV</a>
+                    </div>
+                    <div class="muted">
+                        Exports follow the currently selected app scope.
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -910,6 +957,14 @@
             });
         }
 
+        function updateExportLinks() {
+            const q = qsForApp();
+            document.getElementById("export-events-json").href = `/export/events/json${q}`;
+            document.getElementById("export-incidents-json").href = `/export/incidents/json${q}`;
+            document.getElementById("export-events-csv").href = `/export/events/csv${q}`;
+            document.getElementById("export-incidents-csv").href = `/export/incidents/csv${q}`;
+        }
+
         async function loadStats() {
             const response = await fetch(`/security/stats${qsForApp()}`);
             const data = await response.json();
@@ -933,6 +988,26 @@
             document.getElementById("inc-resolved").textContent = (data.by_status || {}).resolved || 0;
 
             renderBars("incident-status-bars", data.by_status || {});
+        }
+
+        async function loadSummaryReport() {
+            const response = await fetch(`/reports/security-summary${qsForApp()}`);
+            const data = await response.json();
+
+            document.getElementById("report-total-events").textContent = data.summary.total_events || 0;
+            document.getElementById("report-blocked-events").textContent = data.summary.blocked_events || 0;
+            document.getElementById("report-redacted-outputs").textContent = data.summary.redacted_outputs || 0;
+            document.getElementById("report-total-incidents").textContent = data.summary.total_incidents || 0;
+
+            const scope = document.getElementById("report-scope-kv");
+            scope.innerHTML = `
+                <div class="kv-row"><span>App Scope</span><span>${data.scope.app_id}</span></div>
+                <div class="kv-row"><span>Role Scope</span><span>${data.scope.role}</span></div>
+                <div class="kv-row"><span>Total Events</span><span>${data.summary.total_events}</span></div>
+                <div class="kv-row"><span>Total Incidents</span><span>${data.summary.total_incidents}</span></div>
+            `;
+
+            renderBars("report-severity-bars", data.breakdown.by_severity || {});
         }
 
         async function loadEvents() {
@@ -999,6 +1074,7 @@
                 <div class="kv-row"><span>Policy Loaded</span><span>${data.policy_loaded}</span></div>
                 <div class="kv-row"><span>Blocked Patterns</span><span>${data.blocked_patterns_count}</span></div>
                 <div class="kv-row"><span>Exfiltration Patterns</span><span>${data.exfiltration_patterns_count}</span></div>
+                <div class="kv-row"><span>Output Sensitive Patterns</span><span>${data.output_sensitive_patterns_count ?? 0}</span></div>
                 <div class="kv-row"><span>Allowed Tools</span><span>${(data.allowed_tools || []).join(", ")}</span></div>
                 <div class="kv-row"><span>Block Threshold</span><span>${data.block_threshold}</span></div>
             `;
@@ -1083,8 +1159,10 @@
         }
 
         async function refreshAll() {
+            updateExportLinks();
             await loadStats();
             await loadIncidentStats();
+            await loadSummaryReport();
             await loadEvents();
             await loadAlerts();
             await loadPolicyStatus();
@@ -1136,6 +1214,7 @@
         document.getElementById("app-filter").addEventListener("change", refreshAll);
 
         async function initDashboard() {
+            updateExportLinks();
             await refreshAll();
             applyTiltEffects();
             initSpotlight();
