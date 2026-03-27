@@ -3,22 +3,32 @@ from typing import Optional
 import csv
 import io
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from backend.app.db import init_db, SessionLocal, SecurityEvent, Incident
 from backend.app.agent.planner import plan_task
 from backend.app.agent.executor import execute_plan
 from backend.app.security import get_policy_status
+from backend.security.auth import (
+    authenticate_user,
+    create_access_token,
+    decode_access_token,
+    seed_default_users,
+)
 
 app = FastAPI(
     title="SecureAgent",
     description="Backend-first AI agent security platform",
-    version="8.0"
+    version="9.0"
 )
 
 init_db()
+seed_default_users()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 class AgentRequest(BaseModel):
@@ -27,9 +37,67 @@ class AgentRequest(BaseModel):
     role: str = "user"
 
 
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    username = payload.get("sub")
+    role = payload.get("role")
+
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+
+    return {"username": username, "role": role}
+
+
+def require_platform_roles(*allowed_roles):
+    def checker(current_user=Depends(get_current_user)):
+        if current_user["role"] not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{current_user['role']}' not permitted",
+            )
+        return current_user
+    return checker
+
+
 @app.get("/")
 def root():
     return {"message": "Secure Agent Platform Running"}
+
+
+@app.post("/auth/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+
+    token = create_access_token({
+        "sub": user.username,
+        "role": user.role,
+    })
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user.username,
+        "role": user.role,
+    }
+
+
+@app.get("/auth/me")
+def auth_me(current_user=Depends(get_current_user)):
+    return current_user
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -110,7 +178,7 @@ def get_alerts(limit: int = 25, app_id: Optional[str] = None, role: Optional[str
 
 
 @app.get("/incidents")
-def get_incidents(limit: int = 50, app_id: Optional[str] = None, role: Optional[str] = None, status: Optional[str] = None):
+def get_incidents(limit: int = 50, app_id: Optional[str] = None, role: Optional[str] = None, status_filter: Optional[str] = None):
     db = SessionLocal()
     try:
         query = db.query(Incident)
@@ -119,8 +187,8 @@ def get_incidents(limit: int = 50, app_id: Optional[str] = None, role: Optional[
             query = query.filter(Incident.app_id == app_id)
         if role:
             query = query.filter(Incident.role == role)
-        if status:
-            query = query.filter(Incident.status == status)
+        if status_filter:
+            query = query.filter(Incident.status == status_filter)
 
         rows = query.order_by(Incident.id.desc()).limit(limit).all()
 
@@ -174,7 +242,10 @@ def incident_stats(app_id: Optional[str] = None, role: Optional[str] = None):
 
 
 @app.post("/incidents/{incident_id}/ack")
-def acknowledge_incident(incident_id: int):
+def acknowledge_incident(
+    incident_id: int,
+    current_user=Depends(require_platform_roles("admin", "analyst"))
+):
     db = SessionLocal()
     try:
         incident = db.query(Incident).filter(Incident.id == incident_id).first()
@@ -184,13 +255,21 @@ def acknowledge_incident(incident_id: int):
         incident.status = "acknowledged"
         db.commit()
 
-        return {"message": "Incident acknowledged", "incident_id": incident_id, "status": incident.status}
+        return {
+            "message": "Incident acknowledged",
+            "incident_id": incident_id,
+            "status": incident.status,
+            "acted_by": current_user["username"],
+        }
     finally:
         db.close()
 
 
 @app.post("/incidents/{incident_id}/resolve")
-def resolve_incident(incident_id: int):
+def resolve_incident(
+    incident_id: int,
+    current_user=Depends(require_platform_roles("admin"))
+):
     db = SessionLocal()
     try:
         incident = db.query(Incident).filter(Incident.id == incident_id).first()
@@ -200,13 +279,18 @@ def resolve_incident(incident_id: int):
         incident.status = "resolved"
         db.commit()
 
-        return {"message": "Incident resolved", "incident_id": incident_id, "status": incident.status}
+        return {
+            "message": "Incident resolved",
+            "incident_id": incident_id,
+            "status": incident.status,
+            "acted_by": current_user["username"],
+        }
     finally:
         db.close()
 
 
 @app.get("/policy/status")
-def policy_status():
+def policy_status(current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))):
     return get_policy_status()
 
 
@@ -304,7 +388,11 @@ def red_team_test(app_id: str = "default-app", role: str = "user"):
 
 
 @app.get("/reports/security-summary")
-def security_summary_report(app_id: Optional[str] = None, role: Optional[str] = None):
+def security_summary_report(
+    app_id: Optional[str] = None,
+    role: Optional[str] = None,
+    current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))
+):
     db = SessionLocal()
     try:
         event_query = db.query(SecurityEvent)
@@ -370,7 +458,11 @@ def security_summary_report(app_id: Optional[str] = None, role: Optional[str] = 
 
 
 @app.get("/export/events/json")
-def export_events_json(app_id: Optional[str] = None, role: Optional[str] = None):
+def export_events_json(
+    app_id: Optional[str] = None,
+    role: Optional[str] = None,
+    current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))
+):
     db = SessionLocal()
     try:
         query = db.query(SecurityEvent)
@@ -404,7 +496,12 @@ def export_events_json(app_id: Optional[str] = None, role: Optional[str] = None)
 
 
 @app.get("/export/incidents/json")
-def export_incidents_json(app_id: Optional[str] = None, role: Optional[str] = None, status: Optional[str] = None):
+def export_incidents_json(
+    app_id: Optional[str] = None,
+    role: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))
+):
     db = SessionLocal()
     try:
         query = db.query(Incident)
@@ -413,8 +510,8 @@ def export_incidents_json(app_id: Optional[str] = None, role: Optional[str] = No
             query = query.filter(Incident.app_id == app_id)
         if role:
             query = query.filter(Incident.role == role)
-        if status:
-            query = query.filter(Incident.status == status)
+        if status_filter:
+            query = query.filter(Incident.status == status_filter)
 
         rows = query.order_by(Incident.id.desc()).all()
 
@@ -441,7 +538,11 @@ def export_incidents_json(app_id: Optional[str] = None, role: Optional[str] = No
 
 
 @app.get("/export/events/csv")
-def export_events_csv(app_id: Optional[str] = None, role: Optional[str] = None):
+def export_events_csv(
+    app_id: Optional[str] = None,
+    role: Optional[str] = None,
+    current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))
+):
     db = SessionLocal()
     try:
         query = db.query(SecurityEvent)
@@ -486,7 +587,12 @@ def export_events_csv(app_id: Optional[str] = None, role: Optional[str] = None):
 
 
 @app.get("/export/incidents/csv")
-def export_incidents_csv(app_id: Optional[str] = None, role: Optional[str] = None, status: Optional[str] = None):
+def export_incidents_csv(
+    app_id: Optional[str] = None,
+    role: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))
+):
     db = SessionLocal()
     try:
         query = db.query(Incident)
@@ -495,8 +601,8 @@ def export_incidents_csv(app_id: Optional[str] = None, role: Optional[str] = Non
             query = query.filter(Incident.app_id == app_id)
         if role:
             query = query.filter(Incident.role == role)
-        if status:
-            query = query.filter(Incident.status == status)
+        if status_filter:
+            query = query.filter(Incident.status == status_filter)
 
         rows = query.order_by(Incident.id.desc()).all()
 
