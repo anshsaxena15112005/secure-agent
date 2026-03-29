@@ -22,7 +22,7 @@ from backend.security.auth import (
 app = FastAPI(
     title="SecureAgent",
     description="Backend-first AI agent security platform",
-    version="9.0"
+    version="10.0"
 )
 
 init_db()
@@ -73,6 +73,35 @@ def root():
     return {"message": "Secure Agent Platform Running"}
 
 
+# ---------- UI PAGES ----------
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return (Path(__file__).resolve().parent / "login.html").read_text(encoding="utf-8")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page():
+    return (Path(__file__).resolve().parent / "dashboard.html").read_text(encoding="utf-8")
+
+
+@app.get("/testing", response_class=HTMLResponse)
+def testing_page():
+    return (Path(__file__).resolve().parent / "testing.html").read_text(encoding="utf-8")
+
+
+@app.get("/incidents-ui", response_class=HTMLResponse)
+def incidents_page():
+    return (Path(__file__).resolve().parent / "incidents.html").read_text(encoding="utf-8")
+
+
+@app.get("/reports-ui", response_class=HTMLResponse)
+def reports_page():
+    return (Path(__file__).resolve().parent / "reports.html").read_text(encoding="utf-8")
+
+
+# ---------- AUTH ----------
+
 @app.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
@@ -100,11 +129,7 @@ def auth_me(current_user=Depends(get_current_user)):
     return current_user
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard():
-    dashboard_path = Path(__file__).resolve().parent / "dashboard.html"
-    return dashboard_path.read_text(encoding="utf-8")
-
+# ---------- AGENT ----------
 
 @app.post("/agent/run")
 def run_agent(request: AgentRequest):
@@ -112,6 +137,8 @@ def run_agent(request: AgentRequest):
     result = execute_plan(plan, app_id=request.app_id, role=request.role)
     return result
 
+
+# ---------- EVENTS / ALERTS ----------
 
 @app.get("/events")
 def get_events(limit: int = 50, app_id: Optional[str] = None, role: Optional[str] = None):
@@ -177,8 +204,15 @@ def get_alerts(limit: int = 25, app_id: Optional[str] = None, role: Optional[str
         db.close()
 
 
+# ---------- INCIDENTS ----------
+
 @app.get("/incidents")
-def get_incidents(limit: int = 50, app_id: Optional[str] = None, role: Optional[str] = None, status_filter: Optional[str] = None):
+def get_incidents(
+    limit: int = 50,
+    app_id: Optional[str] = None,
+    role: Optional[str] = None,
+    status_filter: Optional[str] = None
+):
     db = SessionLocal()
     try:
         query = db.query(Incident)
@@ -289,6 +323,8 @@ def resolve_incident(
         db.close()
 
 
+# ---------- POLICY / SECURITY ----------
+
 @app.get("/policy/status")
 def policy_status(current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))):
     return get_policy_status()
@@ -308,7 +344,10 @@ def security_stats(app_id: Optional[str] = None, role: Optional[str] = None):
         rows = query.all()
 
         total_events = len(rows)
-        blocked_events = sum(1 for r in rows if r.event_type in {"PROMPT_BLOCKED", "TOOL_BLOCKED", "OUTPUT_BLOCKED"})
+        blocked_events = sum(
+            1 for r in rows
+            if r.event_type in {"PROMPT_BLOCKED", "TOOL_BLOCKED", "OUTPUT_BLOCKED"}
+        )
         allowed_events = sum(1 for r in rows if r.event_type == "TOOL_OK")
         high_risk_events = sum(1 for r in rows if (r.risk or 0) >= 60)
 
@@ -387,6 +426,8 @@ def red_team_test(app_id: str = "default-app", role: str = "user"):
     }
 
 
+# ---------- REPORTS ----------
+
 @app.get("/reports/security-summary")
 def security_summary_report(
     app_id: Optional[str] = None,
@@ -411,7 +452,10 @@ def security_summary_report(
 
         total_events = len(events)
         total_incidents = len(incidents)
-        blocked_events = sum(1 for e in events if e.event_type in {"PROMPT_BLOCKED", "TOOL_BLOCKED", "OUTPUT_BLOCKED"})
+        blocked_events = sum(
+            1 for e in events
+            if e.event_type in {"PROMPT_BLOCKED", "TOOL_BLOCKED", "OUTPUT_BLOCKED"}
+        )
         redacted_outputs = sum(1 for e in events if e.event_type == "OUTPUT_REDACTED")
         high_risk_events = sum(1 for e in events if (e.risk or 0) >= 60)
 
@@ -456,6 +500,8 @@ def security_summary_report(
     finally:
         db.close()
 
+
+# ---------- EXPORTS ----------
 
 @app.get("/export/events/json")
 def export_events_json(
