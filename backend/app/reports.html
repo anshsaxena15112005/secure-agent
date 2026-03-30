@@ -194,10 +194,13 @@
 
         .metric-key {
             color: var(--muted);
+            word-break: break-word;
         }
 
         .metric-value {
             font-weight: 700;
+            text-align: right;
+            word-break: break-word;
         }
 
         .export-grid {
@@ -208,14 +211,16 @@
 
         .export-btn {
             display: block;
+            width: 100%;
             text-align: center;
-            text-decoration: none;
             color: var(--text);
             padding: 14px;
             border: 1px solid var(--line);
             border-radius: 14px;
             background: rgba(255,255,255,0.03);
             transition: 0.18s ease;
+            cursor: pointer;
+            font-size: 14px;
         }
 
         .export-btn:hover {
@@ -385,10 +390,18 @@
             <section class="card">
                 <h2 class="section-title">Export Center</h2>
                 <div class="export-grid">
-                    <a id="export-events-json" class="export-btn" href="#" target="_blank">Export Events JSON</a>
-                    <a id="export-incidents-json" class="export-btn" href="#" target="_blank">Export Incidents JSON</a>
-                    <a id="export-events-csv" class="export-btn" href="#" target="_blank">Export Events CSV</a>
-                    <a id="export-incidents-csv" class="export-btn" href="#" target="_blank">Export Incidents CSV</a>
+                    <button class="export-btn" onclick="downloadExport('/export/events/json', 'secureagent_events.json')">
+                        Export Events JSON
+                    </button>
+                    <button class="export-btn" onclick="downloadExport('/export/incidents/json', 'secureagent_incidents.json')">
+                        Export Incidents JSON
+                    </button>
+                    <button class="export-btn" onclick="downloadExport('/export/events/csv', 'secureagent_events.csv')">
+                        Export Events CSV
+                    </button>
+                    <button class="export-btn" onclick="downloadExport('/export/incidents/csv', 'secureagent_incidents.csv')">
+                        Export Incidents CSV
+                    </button>
                 </div>
                 <div class="status-box" id="report-status"></div>
             </section>
@@ -502,16 +515,6 @@
             renderMetricList("summary-breakdown", combined);
         }
 
-        function updateExportLinks() {
-            const query = buildQueryParams();
-            const suffix = query ? `?${query}` : "";
-
-            document.getElementById("export-events-json").href = `/export/events/json${suffix}`;
-            document.getElementById("export-incidents-json").href = `/export/incidents/json${suffix}`;
-            document.getElementById("export-events-csv").href = `/export/events/csv${suffix}`;
-            document.getElementById("export-incidents-csv").href = `/export/incidents/csv${suffix}`;
-        }
-
         async function fetchJson(url) {
             const response = await fetch(url, {
                 headers: getAuthHeaders()
@@ -546,7 +549,6 @@
             renderMetricList("severity-breakdown", report.breakdown?.by_severity, "No severity data.");
             renderMetricList("app-breakdown", report.breakdown?.by_app, "No app data.");
             renderMetricList("role-breakdown", report.breakdown?.by_role, "No role data.");
-            updateExportLinks();
             setStatus("Report loaded successfully.");
         }
 
@@ -565,6 +567,56 @@
             }
         }
 
+        async function downloadExport(baseUrl, fallbackFilename) {
+            try {
+                const query = buildQueryParams();
+                const url = query ? `${baseUrl}?${query}` : baseUrl;
+
+                const response = await fetch(url, {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (response.status === 403) {
+                    setStatus("Access denied for export.");
+                    return;
+                }
+
+                if (!response.ok) {
+                    setStatus("Export failed.");
+                    return;
+                }
+
+                const blob = await response.blob();
+
+                let filename = fallbackFilename;
+                const disposition = response.headers.get("Content-Disposition");
+                if (disposition) {
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match && match[1]) {
+                        filename = match[1];
+                    }
+                }
+
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(blobUrl);
+
+                setStatus(`Downloaded ${filename}`);
+            } catch (error) {
+                setStatus("Unable to download export.");
+            }
+        }
+
         function applyFilters() {
             loadReportsPage();
         }
@@ -578,4 +630,4 @@
         loadReportsPage();
     </script>
 </body>
-</html>
+</html>Āæśēāæ
