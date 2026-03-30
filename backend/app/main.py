@@ -4,7 +4,7 @@ import csv
 import io
 
 from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -70,7 +70,7 @@ def require_platform_roles(*allowed_roles):
 
 @app.get("/")
 def root():
-    return {"message": "Secure Agent Platform Running"}
+    return RedirectResponse(url="/login", status_code=302)
 
 
 # ---------- UI PAGES ----------
@@ -90,12 +90,12 @@ def testing_page():
     return (Path(__file__).resolve().parent / "testing.html").read_text(encoding="utf-8")
 
 
-@app.get("/incidents-ui", response_class=HTMLResponse)
+@app.get("/incidents", response_class=HTMLResponse)
 def incidents_page():
     return (Path(__file__).resolve().parent / "incidents.html").read_text(encoding="utf-8")
 
 
-@app.get("/reports-ui", response_class=HTMLResponse)
+@app.get("/reports", response_class=HTMLResponse)
 def reports_page():
     return (Path(__file__).resolve().parent / "reports.html").read_text(encoding="utf-8")
 
@@ -204,9 +204,9 @@ def get_alerts(limit: int = 25, app_id: Optional[str] = None, role: Optional[str
         db.close()
 
 
-# ---------- INCIDENTS ----------
+# ---------- INCIDENTS API ----------
 
-@app.get("/incidents")
+@app.get("/api/incidents")
 def get_incidents(
     limit: int = 50,
     app_id: Optional[str] = None,
@@ -246,7 +246,7 @@ def get_incidents(
         db.close()
 
 
-@app.get("/incidents/stats")
+@app.get("/api/incidents/stats")
 def incident_stats(app_id: Optional[str] = None, role: Optional[str] = None):
     db = SessionLocal()
     try:
@@ -275,7 +275,7 @@ def incident_stats(app_id: Optional[str] = None, role: Optional[str] = None):
         db.close()
 
 
-@app.post("/incidents/{incident_id}/ack")
+@app.post("/api/incidents/{incident_id}/ack")
 def acknowledge_incident(
     incident_id: int,
     current_user=Depends(require_platform_roles("admin", "analyst"))
@@ -299,7 +299,7 @@ def acknowledge_incident(
         db.close()
 
 
-@app.post("/incidents/{incident_id}/resolve")
+@app.post("/api/incidents/{incident_id}/resolve")
 def resolve_incident(
     incident_id: int,
     current_user=Depends(require_platform_roles("admin"))

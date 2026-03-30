@@ -9,19 +9,16 @@
             --bg: #0f1419;
             --bg-2: #151c22;
             --panel: rgba(24, 32, 39, 0.92);
-            --line: rgba(173, 191, 204, 0.10);
-            --line-strong: rgba(140, 173, 188, 0.20);
+            --panel-2: rgba(255,255,255,0.03);
+            --line: rgba(173, 191, 204, 0.12);
             --text: #e6edf2;
             --muted: #93a3af;
             --accent: #6f8f98;
             --accent-2: #55717b;
-            --accent-soft: #87aab2;
-            --teal: #6ea29d;
-            --green-bg: rgba(125, 164, 138, 0.14);
-            --red-bg: rgba(184, 132, 132, 0.14);
-            --amber-bg: rgba(178, 154, 116, 0.14);
-            --blue-bg: rgba(126, 155, 170, 0.12);
-            --shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+            --success: #4fa36c;
+            --warning: #d7a54b;
+            --danger: #d46a6a;
+            --shadow: 0 20px 50px rgba(0,0,0,0.22);
         }
 
         * {
@@ -33,102 +30,11 @@
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at 12% 8%, rgba(110,162,157,0.06), transparent 20%),
-                radial-gradient(circle at 88% 12%, rgba(111,143,152,0.06), transparent 22%),
-                linear-gradient(180deg, #0d1216 0%, #12191f 46%, #151c22 100%);
-            min-height: 100vh;
-            overflow-x: hidden;
-            position: relative;
+                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
+                linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
         }
 
-        .bg-scene {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            overflow: hidden;
-            z-index: 0;
-        }
-
-        .grid-floor {
-            position: absolute;
-            inset: -12%;
-            background-image:
-                linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
-            background-size: 46px 46px;
-            opacity: 0.2;
-            transform: perspective(1200px) rotateX(73deg) translateY(-150px) scale(1.8);
-            animation: gridSlide 28s linear infinite;
-        }
-
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(90px);
-            opacity: 0.14;
-            mix-blend-mode: screen;
-            animation: floatOrb 18s ease-in-out infinite alternate;
-        }
-
-        .orb-a {
-            width: 320px;
-            height: 320px;
-            left: -70px;
-            top: 90px;
-            background: radial-gradient(circle, rgba(110,162,157,0.45), transparent 68%);
-        }
-
-        .orb-b {
-            width: 420px;
-            height: 420px;
-            right: -110px;
-            top: 120px;
-            background: radial-gradient(circle, rgba(111,143,152,0.38), transparent 70%);
-            animation-duration: 22s;
-        }
-
-        .tech-ring {
-            position: absolute;
-            border-radius: 50%;
-            border: 1px solid rgba(180, 200, 210, 0.08);
-            box-shadow: inset 0 0 40px rgba(255,255,255,0.015);
-            animation: rotateSlow 30s linear infinite;
-        }
-
-        .ring-a {
-            width: 520px;
-            height: 520px;
-            top: -120px;
-            right: 6%;
-        }
-
-        .ring-b {
-            width: 360px;
-            height: 360px;
-            bottom: 8%;
-            left: -90px;
-            animation-direction: reverse;
-            animation-duration: 24s;
-        }
-
-        @keyframes gridSlide {
-            from { transform: perspective(1200px) rotateX(73deg) translateY(-150px) translateX(0) scale(1.8); }
-            to { transform: perspective(1200px) rotateX(73deg) translateY(-150px) translateX(-46px) scale(1.8); }
-        }
-
-        @keyframes floatOrb {
-            from { transform: translate3d(0, 0, 0) scale(1); }
-            to { transform: translate3d(35px, -24px, 0) scale(1.08); }
-        }
-
-        @keyframes rotateSlow {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .app-shell {
-            position: relative;
-            z-index: 1;
+        .layout {
             display: grid;
             grid-template-columns: 260px 1fr;
             min-height: 100vh;
@@ -136,541 +42,333 @@
 
         .sidebar {
             border-right: 1px solid var(--line);
-            background: linear-gradient(180deg, rgba(20,27,33,0.95), rgba(16,22,27,0.92));
-            backdrop-filter: blur(12px);
+            background: rgba(12, 17, 21, 0.72);
+            backdrop-filter: blur(10px);
             padding: 24px 18px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
         }
 
         .brand {
-            padding: 8px 10px 18px;
-            border-bottom: 1px solid var(--line);
-            margin-bottom: 18px;
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 8px;
         }
 
-        .brand h1 {
-            margin: 0;
-            font-size: 28px;
-            letter-spacing: -0.04em;
-        }
-
-        .brand p {
-            margin: 8px 0 0;
-            color: var(--muted);
+        .brand-sub {
             font-size: 13px;
-            line-height: 1.5;
+            color: var(--muted);
+            margin-bottom: 26px;
         }
 
         .nav {
             display: grid;
-            gap: 8px;
-            margin-top: 14px;
+            gap: 10px;
         }
 
-        .nav a,
-        .nav button {
-            display: flex;
-            align-items: center;
-            width: 100%;
+        .nav a {
             text-decoration: none;
             color: var(--text);
             padding: 12px 14px;
             border-radius: 14px;
             border: 1px solid transparent;
-            background: rgba(255,255,255,0.02);
-            font-size: 14px;
-            cursor: pointer;
+            background: transparent;
+            transition: 0.18s ease;
         }
 
         .nav a:hover,
-        .nav button:hover {
-            border-color: var(--line-strong);
-            background: rgba(255,255,255,0.04);
-        }
-
-        .nav .active {
-            background: linear-gradient(180deg, rgba(111,143,152,0.18), rgba(85,113,123,0.10));
-            border-color: rgba(135,170,178,0.20);
-        }
-
-        .sidebar-footer {
-            position: absolute;
-            left: 18px;
-            right: 18px;
-            bottom: 24px;
-            border-top: 1px solid var(--line);
-            padding-top: 14px;
-        }
-
-        .user-box {
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            padding: 12px;
-            background: rgba(255,255,255,0.02);
-            margin-bottom: 10px;
-        }
-
-        .user-box .label {
-            color: var(--muted);
-            font-size: 12px;
-        }
-
-        .user-box .value {
-            margin-top: 4px;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .logout-btn {
-            width: 100%;
-            border: 1px solid var(--line);
-            background: rgba(255,255,255,0.03);
-            color: var(--text);
-            padding: 11px 12px;
-            border-radius: 12px;
-            cursor: pointer;
+        .nav a.active {
+            background: var(--panel-2);
+            border-color: var(--line);
         }
 
         .main {
-            padding: 24px;
+            padding: 28px;
         }
 
         .topbar {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .page-title h2 {
-            margin: 0;
-            font-size: 34px;
-            letter-spacing: -0.04em;
-        }
-
-        .page-title p {
-            margin: 8px 0 0;
-            color: var(--muted);
-            font-size: 14px;
-        }
-
-        .top-controls {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
             align-items: center;
+            gap: 16px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
         }
 
-        .pill, .select {
+        .topbar h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .topbar p {
+            margin: 6px 0 0;
+            color: var(--muted);
+        }
+
+        .user-box {
+            padding: 12px 14px;
             border: 1px solid var(--line);
-            background: rgba(255,255,255,0.04);
-            color: var(--text);
-            padding: 10px 13px;
-            border-radius: 999px;
-            font-size: 13px;
-            outline: none;
-        }
-
-        .btn {
-            border: 1px solid rgba(125,145,170,0.18);
-            background: linear-gradient(180deg, var(--accent), var(--accent-2));
-            color: white;
-            padding: 10px 14px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 700;
+            border-radius: 14px;
+            background: var(--panel);
             font-size: 14px;
         }
 
-        .btn.secondary {
-            background: rgba(255,255,255,0.03);
-            color: var(--text);
-            border: 1px solid var(--line);
-        }
-
-        .btn.small {
-            padding: 7px 10px;
-            font-size: 12px;
-            border-radius: 10px;
-        }
-
-        .btn.warn {
-            background: linear-gradient(180deg, #8a7860, #6f604d);
-        }
-
-        .btn.ok {
-            background: linear-gradient(180deg, #6c8f79, #55705f);
-        }
-
-        .grid-4 {
+        .grid-cards {
             display: grid;
-            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 16px;
             margin-bottom: 20px;
-        }
-
-        .panel {
-            position: relative;
-            overflow: hidden;
-            border-radius: 20px;
-            border: 1px solid var(--line);
-            background: linear-gradient(180deg, rgba(24,32,39,0.95), rgba(20,27,33,0.92));
-            box-shadow: var(--shadow);
-        }
-
-        .panel::before,
-        .card::before,
-        .list-item::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.025), transparent 34%, transparent 72%, rgba(255,255,255,0.015));
-            pointer-events: none;
         }
 
         .card {
-            position: relative;
-            overflow: hidden;
-            border-radius: 20px;
+            background: var(--panel);
             border: 1px solid var(--line);
-            background: linear-gradient(180deg, rgba(24,32,39,0.95), rgba(20,27,33,0.92));
+            border-radius: 20px;
+            padding: 18px;
             box-shadow: var(--shadow);
-            padding: 18px 20px;
         }
 
-        .card h3 {
-            margin: 0 0 10px;
+        .card-title {
             color: var(--muted);
             font-size: 13px;
-            font-weight: 600;
+            margin-bottom: 10px;
         }
 
-        .card p {
-            margin: 0;
-            font-size: 36px;
+        .card-value {
+            font-size: 30px;
             font-weight: 800;
-            letter-spacing: -0.04em;
-            line-height: 1;
         }
 
-        .sub {
+        .card-sub {
             margin-top: 8px;
+            font-size: 13px;
             color: var(--muted);
-            font-size: 12px;
         }
 
-        .panel-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--line);
-            background: rgba(255,255,255,0.02);
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
         }
 
-        .panel-title {
-            margin: 0;
+        .toolbar button,
+        .toolbar select {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .toolbar button:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .section-title {
+            margin: 0 0 14px;
             font-size: 18px;
         }
 
-        .panel-subtitle {
-            margin: 5px 0 0;
-            color: var(--muted);
-            font-size: 12px;
+        .table-wrap {
+            overflow-x: auto;
         }
 
-        .panel-body {
-            padding: 16px 20px;
-            position: relative;
-            z-index: 1;
+        table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
-        .list {
-            display: grid;
-            gap: 10px;
-        }
-
-        .list-item {
-            position: relative;
-            overflow: hidden;
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            padding: 12px;
-            background: rgba(255,255,255,0.02);
-        }
-
-        .list-item h4 {
-            margin: 0 0 8px;
+        th, td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--line);
             font-size: 14px;
+            vertical-align: top;
         }
 
-        .muted {
+        th {
             color: var(--muted);
-            font-size: 12px;
-            line-height: 1.5;
+            font-weight: 600;
         }
 
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 5px 9px;
+        .pill {
+            display: inline-block;
+            padding: 6px 10px;
             border-radius: 999px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
         }
 
-        .badge-low {
-            background: var(--blue-bg);
-            color: #d2dee8;
+        .low { background: rgba(79,163,108,0.15); color: #8dd4a1; }
+        .medium { background: rgba(215,165,75,0.16); color: #e8c374; }
+        .high { background: rgba(212,106,106,0.16); color: #ef9b9b; }
+        .critical { background: rgba(255,80,80,0.18); color: #ff9a9a; }
+
+        .open { background: rgba(215,165,75,0.16); color: #e8c374; }
+        .acknowledged { background: rgba(111,143,152,0.18); color: #b7d1d8; }
+        .resolved { background: rgba(79,163,108,0.15); color: #8dd4a1; }
+
+        .muted {
+            color: var(--muted);
         }
 
-        .badge-medium {
-            background: var(--amber-bg);
-            color: #eadbb9;
+        .empty {
+            color: var(--muted);
+            font-size: 14px;
+            padding: 8px 0;
         }
 
-        .badge-high, .badge-critical {
-            background: var(--red-bg);
-            color: #f0cccc;
-        }
-
-        .badge-open {
-            background: var(--red-bg);
-            color: #f0cccc;
-        }
-
-        .badge-acknowledged {
-            background: var(--amber-bg);
-            color: #eadbb9;
-        }
-
-        .badge-resolved {
-            background: var(--green-bg);
-            color: #c8dfcf;
-        }
-
-        .incident-actions {
+        .action-buttons {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            margin-top: 10px;
         }
 
-        @media (max-width: 1200px) {
-            .app-shell {
-                grid-template-columns: 1fr;
-            }
+        .btn-small {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.03);
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
 
-            .sidebar {
-                position: relative;
-                height: auto;
-                border-right: none;
-                border-bottom: 1px solid var(--line);
-            }
+        .btn-small:hover {
+            background: rgba(255,255,255,0.05);
+        }
 
-            .sidebar-footer {
-                position: static;
-                margin-top: 14px;
-            }
-
-            .grid-4 {
-                grid-template-columns: repeat(2, minmax(180px, 1fr));
+        @media (max-width: 1100px) {
+            .grid-cards {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
         @media (max-width: 760px) {
-            .grid-4 {
+            .layout {
                 grid-template-columns: 1fr;
             }
 
-            .topbar {
-                flex-direction: column;
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .grid-cards {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <div class="bg-scene">
-        <div class="grid-floor"></div>
-        <div class="orb orb-a"></div>
-        <div class="orb orb-b"></div>
-        <div class="tech-ring ring-a"></div>
-        <div class="tech-ring ring-b"></div>
-    </div>
-
-    <div class="app-shell">
+    <div class="layout">
         <aside class="sidebar">
-            <div class="brand">
-                <h1>SecureAgent</h1>
-                <p>AI runtime security and control platform</p>
-            </div>
+            <div class="brand">SecureAgent</div>
+            <div class="brand-sub">AI Runtime Security Platform</div>
 
             <nav class="nav">
-                <a href="/dashboard">Overview</a>
+                <a href="/dashboard">Dashboard</a>
                 <a href="/testing">Testing</a>
-                <a class="active" href="/incidents-ui">Incidents</a>
-                <a href="/reports-ui">Reports</a>
+                <a href="/incidents" class="active">Incidents</a>
+                <a href="/reports">Reports</a>
+                <a href="#" onclick="logout()">Logout</a>
             </nav>
-
-            <div class="sidebar-footer">
-                <div class="user-box">
-                    <div class="label">Logged in as</div>
-                    <div class="value" id="sidebar-username">--</div>
-                </div>
-                <div class="user-box">
-                    <div class="label">Platform role</div>
-                    <div class="value" id="sidebar-role">--</div>
-                </div>
-                <button class="logout-btn" onclick="logout()">Logout</button>
-            </div>
         </aside>
 
         <main class="main">
             <div class="topbar">
-                <div class="page-title">
-                    <h2>Incidents</h2>
-                    <p>Track, acknowledge, and resolve security incidents across protected AI applications.</p>
+                <div>
+                    <h1>Incident Center</h1>
+                    <p>Review, acknowledge, and resolve runtime security incidents</p>
                 </div>
 
-                <div class="top-controls">
-                    <select id="app-filter" class="select">
-                        <option value="">All Apps</option>
-                        <option value="default-app">default-app</option>
-                        <option value="customer-support-bot">customer-support-bot</option>
-                        <option value="finance-copilot">finance-copilot</option>
-                    </select>
-
-                    <select id="status-filter" class="select">
-                        <option value="">All Statuses</option>
-                        <option value="open">Open</option>
-                        <option value="acknowledged">Acknowledged</option>
-                        <option value="resolved">Resolved</option>
-                    </select>
-
-                    <div class="pill" id="last-updated">Last updated: --</div>
-                    <button class="btn secondary" onclick="refreshAll()">Refresh</button>
+                <div class="user-box">
+                    <div><strong id="current-username">Loading...</strong></div>
+                    <div class="muted" id="current-role">Checking access</div>
                 </div>
             </div>
 
-            <div class="grid-4">
-                <div class="card">
-                    <h3>Total Incidents</h3>
-                    <p id="inc-total">0</p>
-                    <div class="sub">All incidents in selected scope</div>
-                </div>
-                <div class="card">
-                    <h3>Open</h3>
-                    <p id="inc-open">0</p>
-                    <div class="sub">Require immediate action</div>
-                </div>
-                <div class="card">
-                    <h3>Acknowledged</h3>
-                    <p id="inc-ack">0</p>
-                    <div class="sub">Under investigation</div>
-                </div>
-                <div class="card">
-                    <h3>Resolved</h3>
-                    <p id="inc-resolved">0</p>
-                    <div class="sub">Closed incidents</div>
-                </div>
+            <div class="toolbar">
+                <button onclick="loadIncidentsPage()">Refresh</button>
+
+                <select id="status-filter" onchange="loadIncidents()">
+                    <option value="">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="resolved">Resolved</option>
+                </select>
             </div>
 
-            <section class="panel">
-                <div class="panel-header">
-                    <h3 class="panel-title">Incident Queue</h3>
-                    <div class="panel-subtitle">Operational incident feed with platform-role based actions.</div>
+            <section class="grid-cards">
+                <div class="card">
+                    <div class="card-title">Total Incidents</div>
+                    <div class="card-value" id="total-incidents">0</div>
+                    <div class="card-sub">All recorded incidents</div>
                 </div>
-                <div class="panel-body">
-                    <div id="incidents-list" class="list"></div>
+
+                <div class="card">
+                    <div class="card-title">Open</div>
+                    <div class="card-value" id="open-incidents">0</div>
+                    <div class="card-sub">Awaiting action</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Acknowledged</div>
+                    <div class="card-value" id="ack-incidents">0</div>
+                    <div class="card-sub">Under analyst review</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Resolved</div>
+                    <div class="card-value" id="resolved-incidents">0</div>
+                    <div class="card-sub">Closed incidents</div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2 class="section-title">Incident Log</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Status</th>
+                                <th>Tool</th>
+                                <th>Reason</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="incidents-body">
+                            <tr>
+                                <td colspan="8" class="empty">Loading incidents...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </main>
     </div>
 
     <script>
+        const TOKEN_KEY = "secureagent_token";
+        const USER_KEY = "secureagent_user";
+
         function getToken() {
-            return localStorage.getItem("secureagent_token");
+            return localStorage.getItem(TOKEN_KEY);
         }
 
-        function clearToken() {
-            localStorage.removeItem("secureagent_token");
-            localStorage.removeItem("secureagent_user");
-        }
-
-        async function authFetch(url, options = {}) {
+        function getAuthHeaders() {
             const token = getToken();
-            const headers = { ...(options.headers || {}) };
-
-            if (token) {
-                headers["Authorization"] = `Bearer ${token}`;
-            }
-
-            return fetch(url, { ...options, headers });
+            return token ? { Authorization: `Bearer ${token}` } : {};
         }
 
         function logout() {
-            clearToken();
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
             window.location.href = "/login";
-        }
-
-        function getStoredUser() {
-            const raw = localStorage.getItem("secureagent_user");
-            return raw ? JSON.parse(raw) : null;
-        }
-
-        function canAcknowledge() {
-            const user = getStoredUser();
-            return user && (user.role === "admin" || user.role === "analyst");
-        }
-
-        function canResolve() {
-            const user = getStoredUser();
-            return user && user.role === "admin";
-        }
-
-        function getAppId() {
-            return document.getElementById("app-filter").value;
-        }
-
-        function getStatusFilter() {
-            return document.getElementById("status-filter").value;
-        }
-
-        function buildIncidentQuery() {
-            const params = new URLSearchParams();
-            const appId = getAppId();
-            const statusFilter = getStatusFilter();
-
-            if (appId) params.append("app_id", appId);
-            if (statusFilter) params.append("status_filter", statusFilter);
-
-            const qs = params.toString();
-            return qs ? `?${qs}` : "";
-        }
-
-        function buildStatsQuery() {
-            const params = new URLSearchParams();
-            const appId = getAppId();
-
-            if (appId) params.append("app_id", appId);
-
-            const qs = params.toString();
-            return qs ? `?${qs}` : "";
-        }
-
-        function updateTimestamp() {
-            const now = new Date();
-            document.getElementById("last-updated").textContent = `Last updated: ${now.toLocaleString()}`;
-        }
-
-        function severityBadge(sev) {
-            const safe = sev || "low";
-            return `<span class="badge badge-${safe}">${safe.toUpperCase()}</span>`;
-        }
-
-        function statusBadge(status) {
-            const s = status || "open";
-            return `<span class="badge badge-${s}">${s.toUpperCase()}</span>`;
         }
 
         async function ensureLoggedIn() {
@@ -680,100 +378,218 @@
                 return false;
             }
 
-            const response = await authFetch("/auth/me");
-            if (!response.ok) {
-                clearToken();
-                window.location.href = "/login";
+            try {
+                const response = await fetch("/auth/me", {
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    logout();
+                    return false;
+                }
+
+                const user = await response.json();
+                document.getElementById("current-username").textContent = user.username;
+                document.getElementById("current-role").textContent = user.role;
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+                return user;
+            } catch (error) {
+                logout();
                 return false;
             }
-
-            const user = await response.json();
-            document.getElementById("sidebar-username").textContent = user.username;
-            document.getElementById("sidebar-role").textContent = user.role;
-            localStorage.setItem("secureagent_user", JSON.stringify(user));
-            return true;
         }
 
-        async function loadIncidentStats() {
-            const response = await fetch(`/incidents/stats${buildStatsQuery()}`);
-            const data = await response.json();
-
-            document.getElementById("inc-total").textContent = data.total_incidents || 0;
-            document.getElementById("inc-open").textContent = (data.by_status || {}).open || 0;
-            document.getElementById("inc-ack").textContent = (data.by_status || {}).acknowledged || 0;
-            document.getElementById("inc-resolved").textContent = (data.by_status || {}).resolved || 0;
+        function formatTime(value) {
+            if (!value) return "-";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
         }
 
-        async function loadIncidents() {
-            const response = await fetch(`/incidents${buildIncidentQuery()}`);
-            const data = await response.json();
+        function severityClass(severity) {
+            const s = (severity || "low").toLowerCase();
+            if (["low", "medium", "high", "critical"].includes(s)) return s;
+            return "low";
+        }
 
-            const container = document.getElementById("incidents-list");
-            container.innerHTML = "";
+        function statusClass(status) {
+            const s = (status || "open").toLowerCase();
+            if (["open", "acknowledged", "resolved"].includes(s)) return s;
+            return "open";
+        }
 
-            if (!data.length) {
-                container.innerHTML = `<div class="list-item"><div class="muted">No incidents found for this scope.</div></div>`;
+        function getStoredUser() {
+            try {
+                return JSON.parse(localStorage.getItem(USER_KEY) || "{}");
+            } catch {
+                return {};
+            }
+        }
+
+        function canAcknowledge(userRole, incidentStatus) {
+            return ["admin", "analyst"].includes(userRole) && incidentStatus === "open";
+        }
+
+        function canResolve(userRole, incidentStatus) {
+            return userRole === "admin" && incidentStatus !== "resolved";
+        }
+
+        function renderStats(stats) {
+            document.getElementById("total-incidents").textContent = stats.total_incidents ?? 0;
+            document.getElementById("open-incidents").textContent = stats.by_status?.open ?? 0;
+            document.getElementById("ack-incidents").textContent = stats.by_status?.acknowledged ?? 0;
+            document.getElementById("resolved-incidents").textContent = stats.by_status?.resolved ?? 0;
+        }
+
+        function renderIncidents(incidents) {
+            const body = document.getElementById("incidents-body");
+            const user = getStoredUser();
+            const userRole = user.role || "";
+
+            if (!incidents || incidents.length === 0) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty">No incidents found.</td>
+                    </tr>
+                `;
                 return;
             }
 
-            data.forEach(incident => {
-                const ackButton = canAcknowledge() && incident.status === "open"
-                    ? `<button class="btn small warn" onclick="ackIncident(${incident.id})">Acknowledge</button>`
-                    : "";
+            body.innerHTML = incidents.map(incident => {
+                let actions = `<span class="muted">No actions</span>`;
 
-                const resolveButton = canResolve() && incident.status !== "resolved"
-                    ? `<button class="btn small ok" onclick="resolveIncident(${incident.id})">Resolve</button>`
-                    : "";
+                if (incident.status !== "resolved") {
+                    const buttons = [];
 
-                const item = document.createElement("div");
-                item.className = "list-item";
-                item.innerHTML = `
-                    <h4>Incident #${incident.id} · ${incident.app_id || "default-app"}</h4>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-                        ${severityBadge(incident.severity)}
-                        ${statusBadge(incident.status)}
-                    </div>
-                    <div class="muted"><strong>Type:</strong> ${incident.event_type || "N/A"}</div>
-                    <div class="muted"><strong>AI App Role:</strong> ${incident.role || "user"} · <strong>Tool:</strong> ${incident.tool || "N/A"} · <strong>Risk:</strong> ${incident.risk ?? 0}</div>
-                    <div class="muted"><strong>Reason:</strong> ${incident.reason || "N/A"}</div>
-                    <div class="muted"><strong>Goal:</strong> ${incident.goal || ""}</div>
-                    <div class="incident-actions">
-                        ${ackButton}
-                        ${resolveButton}
-                    </div>
+                    if (canAcknowledge(userRole, incident.status)) {
+                        buttons.push(`
+                            <button class="btn-small" onclick="acknowledgeIncident(${incident.id})">
+                                Acknowledge
+                            </button>
+                        `);
+                    }
+
+                    if (canResolve(userRole, incident.status)) {
+                        buttons.push(`
+                            <button class="btn-small" onclick="resolveIncident(${incident.id})">
+                                Resolve
+                            </button>
+                        `);
+                    }
+
+                    if (buttons.length > 0) {
+                        actions = `<div class="action-buttons">${buttons.join("")}</div>`;
+                    }
+                }
+
+                return `
+                    <tr>
+                        <td>#${incident.id}</td>
+                        <td>${formatTime(incident.timestamp)}</td>
+                        <td>${incident.event_type || "-"}</td>
+                        <td><span class="pill ${severityClass(incident.severity)}">${incident.severity || "low"}</span></td>
+                        <td><span class="pill ${statusClass(incident.status)}">${incident.status || "open"}</span></td>
+                        <td>${incident.tool || "-"}</td>
+                        <td>${incident.reason || "-"}</td>
+                        <td>${actions}</td>
+                    </tr>
                 `;
-                container.appendChild(item);
+            }).join("");
+        }
+
+        async function fetchJson(url) {
+            const response = await fetch(url, {
+                headers: getAuthHeaders()
             });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            if (!response.ok) {
+                throw new Error(`Request failed: ${url}`);
+            }
+
+            return response.json();
         }
 
-        async function ackIncident(id) {
-            if (!canAcknowledge()) return;
-            const response = await authFetch(`/incidents/${id}/ack`, { method: "POST" });
-            if (response.ok) await refreshAll();
+        async function fetchPost(url) {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || "Request failed");
+            }
+
+            return data;
         }
 
-        async function resolveIncident(id) {
-            if (!canResolve()) return;
-            const response = await authFetch(`/incidents/${id}/resolve`, { method: "POST" });
-            if (response.ok) await refreshAll();
+        async function loadIncidentStats() {
+            const stats = await fetchJson("/api/incidents/stats");
+            renderStats(stats);
         }
 
-        async function refreshAll() {
-            await loadIncidentStats();
-            await loadIncidents();
-            updateTimestamp();
+        async function loadIncidents() {
+            const status = document.getElementById("status-filter").value;
+            let url = "/api/incidents?limit=20";
+
+            if (status) {
+                url += `&status_filter=${encodeURIComponent(status)}`;
+            }
+
+            const incidents = await fetchJson(url);
+            renderIncidents(incidents);
         }
 
-        document.getElementById("app-filter").addEventListener("change", refreshAll);
-        document.getElementById("status-filter").addEventListener("change", refreshAll);
+        async function loadIncidentsPage() {
+            try {
+                const user = await ensureLoggedIn();
+                if (!user) return;
 
-        async function initPage() {
-            const ok = await ensureLoggedIn();
-            if (!ok) return;
-            await refreshAll();
+                await Promise.all([
+                    loadIncidentStats(),
+                    loadIncidents()
+                ]);
+            } catch (error) {
+                document.getElementById("incidents-body").innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty">Failed to load incidents.</td>
+                    </tr>
+                `;
+            }
         }
 
-        initPage();
+        async function acknowledgeIncident(incidentId) {
+            try {
+                await fetchPost(`/api/incidents/${incidentId}/ack`);
+                alert(`Incident #${incidentId} acknowledged.`);
+                loadIncidentsPage();
+            } catch (error) {
+                alert(error.message || "Unable to acknowledge incident.");
+            }
+        }
+
+        async function resolveIncident(incidentId) {
+            try {
+                await fetchPost(`/api/incidents/${incidentId}/resolve`);
+                alert(`Incident #${incidentId} resolved.`);
+                loadIncidentsPage();
+            } catch (error) {
+                alert(error.message || "Unable to resolve incident.");
+            }
+        }
+
+        loadIncidentsPage();
     </script>
 </body>
 </html>

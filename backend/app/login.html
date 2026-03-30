@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,7 +16,7 @@
             --accent: #6f8f98;
             --accent-2: #55717b;
             --accent-soft: #87aab2;
-            --shadow: 0 20px 50px rgba(0,0,0,0.28);
+            --shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
         }
 
         * {
@@ -28,8 +29,8 @@
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at 15% 12%, rgba(110,162,157,0.08), transparent 20%),
-                radial-gradient(circle at 85% 15%, rgba(111,143,152,0.08), transparent 22%),
+                radial-gradient(circle at 15% 12%, rgba(110, 162, 157, 0.08), transparent 20%),
+                radial-gradient(circle at 85% 15%, rgba(111, 143, 152, 0.08), transparent 22%),
                 linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
             display: grid;
             place-items: center;
@@ -41,8 +42,8 @@
             position: absolute;
             inset: -10%;
             background-image:
-                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
             background-size: 42px 42px;
             transform: perspective(1000px) rotateX(72deg) translateY(-140px) scale(1.7);
             opacity: 0.18;
@@ -65,7 +66,7 @@
             height: 320px;
             left: -60px;
             top: 80px;
-            background: radial-gradient(circle, rgba(110,162,157,0.45), transparent 68%);
+            background: radial-gradient(circle, rgba(110, 162, 157, 0.45), transparent 68%);
         }
 
         .orb-b {
@@ -73,7 +74,7 @@
             height: 420px;
             right: -110px;
             top: 120px;
-            background: radial-gradient(circle, rgba(111,143,152,0.38), transparent 70%);
+            background: radial-gradient(circle, rgba(111, 143, 152, 0.38), transparent 70%);
             animation-duration: 20s;
         }
 
@@ -97,7 +98,7 @@
             overflow: hidden;
             border-radius: 26px;
             border: 1px solid var(--line);
-            background: linear-gradient(180deg, rgba(24,32,39,0.94), rgba(20,27,33,0.92));
+            background: linear-gradient(180deg, rgba(24, 32, 39, 0.94), rgba(20, 27, 33, 0.92));
             box-shadow: var(--shadow);
         }
 
@@ -106,7 +107,7 @@
             content: "";
             position: absolute;
             inset: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent 34%, transparent 72%, rgba(255,255,255,0.015));
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 34%, transparent 72%, rgba(255, 255, 255, 0.015));
             pointer-events: none;
         }
 
@@ -123,7 +124,7 @@
             width: fit-content;
             padding: 8px 12px;
             border-radius: 999px;
-            background: rgba(255,255,255,0.04);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--line);
             color: var(--muted);
             font-size: 12px;
@@ -155,7 +156,7 @@
             padding: 14px 16px;
             border-radius: 16px;
             border: 1px solid var(--line);
-            background: rgba(255,255,255,0.025);
+            background: rgba(255, 255, 255, 0.025);
             color: var(--text);
             font-size: 14px;
         }
@@ -195,7 +196,7 @@
         .input {
             width: 100%;
             border: 1px solid var(--line);
-            background: rgba(255,255,255,0.04);
+            background: rgba(255, 255, 255, 0.04);
             color: var(--text);
             border-radius: 14px;
             padding: 13px 14px;
@@ -204,14 +205,14 @@
         }
 
         .input:focus {
-            border-color: rgba(135,170,178,0.35);
-            box-shadow: 0 0 0 3px rgba(135,170,178,0.08);
+            border-color: rgba(135, 170, 178, 0.35);
+            box-shadow: 0 0 0 3px rgba(135, 170, 178, 0.08);
         }
 
         .btn {
             margin-top: 4px;
             width: 100%;
-            border: 1px solid rgba(125,145,170,0.18);
+            border: 1px solid rgba(125, 145, 170, 0.18);
             background: linear-gradient(180deg, var(--accent), var(--accent-2));
             color: white;
             padding: 13px 16px;
@@ -253,14 +254,20 @@
             from {
                 transform: perspective(1000px) rotateX(72deg) translateY(-140px) translateX(0) scale(1.7);
             }
+
             to {
                 transform: perspective(1000px) rotateX(72deg) translateY(-140px) translateX(-42px) scale(1.7);
             }
         }
 
         @keyframes floatOrb {
-            from { transform: translate3d(0, 0, 0) scale(1); }
-            to { transform: translate3d(35px, -26px, 0) scale(1.08); }
+            from {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            to {
+                transform: translate3d(35px, -26px, 0) scale(1.08);
+            }
         }
 
         @media (max-width: 900px) {
@@ -274,6 +281,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="bg-grid"></div>
     <div class="orb orb-a"></div>
@@ -286,7 +294,8 @@
                 <h1>AI Security.<br>Runtime Control.<br>Incident Response.</h1>
                 <p>
                     SecureAgent is a unified platform for protecting, monitoring, testing, and governing
-                    AI applications through runtime enforcement, alerts, incidents, reporting, and operator access control.
+                    AI applications through runtime enforcement, alerts, incidents, reporting, and operator access
+                    control.
                 </p>
 
                 <div class="hero-list">
@@ -329,12 +338,21 @@
     </div>
 
     <script>
+        const TOKEN_KEY = "secureagent_token";
+        const USER_KEY = "secureagent_user";
+
+        // 🔁 Auto redirect if already logged in
+        const existingToken = localStorage.getItem(TOKEN_KEY);
+        if (existingToken) {
+            window.location.href = "/dashboard";
+        }
+
         function setToken(token) {
-            localStorage.setItem("secureagent_token", token);
+            localStorage.setItem(TOKEN_KEY, token);
         }
 
         function setStoredUser(user) {
-            localStorage.setItem("secureagent_user", JSON.stringify(user));
+            localStorage.setItem(USER_KEY, JSON.stringify(user));
         }
 
         async function login() {
@@ -376,13 +394,16 @@
                 });
 
                 statusEl.textContent = "Login successful. Redirecting...";
-                window.location.href = "/dashboard";
+                setTimeout(() => {
+                    window.location.href = "/dashboard";
+                }, 800);
+
             } catch (error) {
                 statusEl.textContent = "Unable to connect to the server.";
             }
         }
 
-        document.getElementById("password").addEventListener("keydown", function(event) {
+        document.getElementById("password").addEventListener("keydown", function (event) {
             if (event.key === "Enter") {
                 login();
             }
