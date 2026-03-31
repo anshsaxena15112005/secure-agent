@@ -114,6 +114,113 @@ secure-agent/
 
 ---
 
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+    user[User / Analyst / Admin / Auditor]
+
+    subgraph frontend[Frontend Pages]
+        login[login.html]
+        dashboard[dashboard.html]
+        testing[testing.html]
+        incidents[incidents.html]
+        reports[reports.html]
+    end
+
+    subgraph backend[FastAPI Backend]
+        main[main.py Routes]
+        auth[JWT Auth]
+        planner[Agent Planner]
+        executor[Agent Executor]
+        security[Security Policy Engine]
+        dbmod[DB Layer]
+        reports_api[Reports APIs]
+        incidents_api[Incidents APIs]
+        events_api[Events / Alerts APIs]
+    end
+
+    subgraph database[Storage]
+        sqlite[(secureagent.db)]
+    end
+
+    user --> login
+    user --> dashboard
+    user --> testing
+    user --> incidents
+    user --> reports
+
+    login --> main
+    dashboard --> main
+    testing --> main
+    incidents --> main
+    reports --> main
+
+    main --> auth
+    main --> planner
+    main --> executor
+    main --> security
+    main --> dbmod
+    main --> reports_api
+    main --> incidents_api
+    main --> events_api
+
+    planner --> executor
+    executor --> security
+    security --> dbmod
+    reports_api --> dbmod
+    incidents_api --> dbmod
+    events_api --> dbmod
+
+    dbmod --> sqlite
+```
+
+---
+
+## Data Flow Diagram
+
+```mermaid
+flowchart TD
+    A[User submits login] --> B[FastAPI auth route]
+    B --> C[JWT token generated]
+    C --> D[User accesses dashboard / testing / incidents / reports]
+
+    D --> E[Frontend sends request to backend API]
+    E --> F[Security / agent processing]
+    F --> G[Policy evaluation]
+    G --> H[Event logged in database]
+
+    H --> I{Risk detected?}
+    I -- No --> J[Return safe response]
+    I -- Yes --> K[Create incident]
+    K --> L[Incident stored in database]
+    L --> M[Visible in Incident Center]
+
+    H --> N[Visible in Dashboard]
+    L --> O[Visible in Reports]
+    O --> P[Export JSON / CSV]
+```
+
+---
+
+## Project Description
+
+SecureAgent is a backend-first AI runtime security platform designed to monitor, test, and control AI agent behavior in real time. It includes authentication, runtime event tracking, alert visibility, incident handling, protected reporting, exportable evidence, and a testing lab for evaluating safe and unsafe agent behavior. The platform is built with FastAPI and demonstrates how security controls can be layered around AI systems in an industry-style workflow.
+
+---
+
+## How the System Works
+
+1. A user logs into the platform using role-based authentication.
+2. Frontend pages interact with FastAPI backend routes and APIs.
+3. Agent requests are processed through planner, executor, and security checks.
+4. Security events are logged to the database.
+5. High-risk or unsafe behavior can generate incidents.
+6. Operators review data through dashboard, incidents, reports, and testing pages.
+7. Reports and evidence can be exported in JSON or CSV format.
+
+---
+
 ## Tech Stack
 
 - **Backend**: FastAPI
