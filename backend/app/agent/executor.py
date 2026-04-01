@@ -1,123 +1,165 @@
-from backend.app.tools import TOOLS
-from backend.app.security import allow_tool_call, inspect_output, log_event
+from backend.app.security import analyze_prompt, evaluate_tool_use, inspect_output
+from backend.app.db import SessionLocal, SecurityEvent, Incident
 
 
-def execute_plan(plan: dict, app_id: str = "default-app", role: str = "user"):
-    goal = plan["goal"]
-    tool_name = plan["tool"]
-    tool_input = plan["tool_input"]
-
-    allowed, reason, risk = allow_tool_call(goal, tool_name, role=role)
-
-    if not allowed:
-        log_event(
-            event_type="PROMPT_BLOCKED",
-            goal=goal,
-            tool=tool_name,
+def log_event(
+    app_id: str,
+    role: str,
+    event_type: str,
+    severity: str,
+    tool: str,
+    reason: str,
+    risk: int,
+    goal: str,
+):
+    db = SessionLocal()
+    try:
+        event = SecurityEvent(
+            app_id=app_id,
+            role=role,
+            event_type=event_type,
+            severity=severity,
+            tool=tool,
             reason=reason,
             risk=risk,
-            app_id=app_id,
-            role=role
-        )
-        return {
-            "status": "blocked",
-            "app_id": app_id,
-            "role": role,
-            "goal": goal,
-            "tool": tool_name,
-            "reason": reason,
-            "risk": risk,
-            "severity": "critical" if risk >= 85 else "high" if risk >= 60 else "medium",
-            "steps": plan.get("steps", [])
-        }
-
-    tool_func = TOOLS.get(tool_name)
-
-    if tool_func is None:
-        log_event(
-            event_type="TOOL_BLOCKED",
             goal=goal,
-            tool=tool_name,
-            reason="Unknown tool requested",
-            risk=80,
+        )
+        db.add(event)
+        db.commit()
+
+        if severity in {"high", "critical"} or risk >= 60:
+            incident = Incident(
+                app_id=app_id,
+                role=role,
+                event_type=event_type,
+                severity=severity,
+                tool=tool,
+                reason=reason,
+                risk=risk,
+                goal=goal,
+                status="open",
+            )
+            db.add(incident)
+            db.commit()
+
+    finally:
+        db.close()
+
+
+def execute_plan(plan, app_id="default-app", role="user"):
+    goal = plan.get("goal", "")
+    tool = plan.get("tool", "none")
+
+    prompt_check = analyze_prompt(goal)
+    if prompt_check["blocked"]:
+        reason = "; ".join(prompt_check["reasons"]) or "Prompt blocked by security policy"
+        log_event(
             app_id=app_id,
-            role=role
+            role=role,
+            event_type="PROMPT_BLOCKED",
+            severity=prompt_check["severity"],
+            tool=tool,
+            reason=reason,
+            risk=prompt_check["risk"],
+            goal=goal,
         )
         return {
-            "status": "error",
-            "app_id": app_id,
-            "role": role,
-            "goal": goal,
-            "tool": tool_name,
-            "reason": "Unknown tool requested",
-            "risk": 80,
-            "severity": "high",
-            "steps": plan.get("steps", [])
+            "status": "blocked",
+            "stage": "prompt",
+            "risk": prompt_check["risk"],
+            "severity": prompt_check["severity"],
+            "reason": reason,
+            "matches": prompt_check["matches"],
         }
 
-    raw_output = tool_func(tool_input)
-
-    inspection = inspect_output(
-        output=raw_output,
-        app_id=app_id,
-        role=role,
-        tool=tool_name,
-        goal=goal,
-    )
-
-    if inspection["status"] == "blocked":
+    tool_check = evaluate_tool_use(tool)
+    if not tool_check["allowed"]:
+        log_event(
+            app_id=app_id,
+            role=role,
+            event_type="TOOL_BLOCKED",
+            severity=tool_check["severity"],
+            tool=tool,
+            reason=tool_check["reason"],
+            risk=tool_check["risk"],
+            goal=goal,
+        )
         return {
             "status": "blocked",
-            "app_id": app_id,
-            "role": role,
-            "goal": goal,
-            "intent": plan.get("intent"),
-            "tool": tool_name,
-            "tool_input": tool_input,
-            "steps": plan.get("steps", []),
-            "severity": "high",
-            "reason": inspection["reason"],
-            "risk": inspection["risk"],
-            "output": inspection["output"],
+            "stage": "tool",
+            "risk": tool_check["risk"],
+            "severity": tool_check["severity"],
+            "reason": tool_check["reason"],
+            "tool": tool,
         }
 
-    if inspection["status"] == "redacted":
+    simulated_output = f"Executed goal safely: {goal}"
+
+    output_check = inspect_output(simulated_output)
+    if output_check["blocked"]:
+        log_event(
+            app_id=app_id,
+            role=role,
+            event_type="OUTPUT_BLOCKED",
+            severity=output_check["severity"],
+            tool=tool,
+            reason="; ".join(output_check["reasons"]),
+            risk=output_check["risk"],
+            goal=goal,
+        )
+        return {
+            "status": "blocked",
+            "stage": "output",
+            "risk": output_check["risk"],
+            "severity": output_check["severity"],
+            "reason": "; ".join(output_check["reasons"]),
+        }
+
+    if output_check["redacted"]:
+        log_event(
+            app_id=app_id,
+            role=role,
+            event_type="OUTPUT_REDACTED",
+            severity=output_check["severity"],
+            tool=tool,
+            reason="; ".join(output_check["reasons"]),
+            risk=output_check["risk"],
+            goal=goal,
+        )
         return {
             "status": "ok",
-            "app_id": app_id,
-            "role": role,
-            "goal": goal,
-            "intent": plan.get("intent"),
-            "tool": tool_name,
-            "tool_input": tool_input,
-            "steps": plan.get("steps", []),
-            "severity": "medium",
-            "reason": inspection["reason"],
-            "risk": inspection["risk"],
-            "output": inspection["output"],
-            "output_security": "redacted",
+            "stage": "output",
+            "risk": output_check["risk"],
+            "severity": output_check["severity"],
+            "message": "Output redacted for safety",
+            "output": output_check["safe_output"],
         }
 
+    combined_risk = max(prompt_check["risk"], tool_check["risk"])
+    combined_severity = "low"
+    if combined_risk >= 80:
+        combined_severity = "critical"
+    elif combined_risk >= 60:
+        combined_severity = "high"
+    elif combined_risk >= 30:
+        combined_severity = "medium"
+
     log_event(
-        event_type="TOOL_OK",
-        goal=goal,
-        tool=tool_name,
-        reason="Executed successfully",
-        risk=0,
         app_id=app_id,
-        role=role
+        role=role,
+        event_type="TOOL_OK",
+        severity=combined_severity,
+        tool=tool,
+        reason=tool_check["reason"],
+        risk=combined_risk,
+        goal=goal,
     )
 
     return {
         "status": "ok",
-        "app_id": app_id,
-        "role": role,
-        "goal": goal,
-        "intent": plan.get("intent"),
-        "tool": tool_name,
-        "tool_input": tool_input,
-        "steps": plan.get("steps", []),
-        "severity": "low",
-        "output": raw_output,
-        "output_security": "safe",
+        "stage": "complete",
+        "risk": combined_risk,
+        "severity": combined_severity,
+        "tool": tool,
+        "output": simulated_output,
     }

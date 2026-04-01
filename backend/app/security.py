@@ -1,253 +1,173 @@
-from pathlib import Path
 import re
-import yaml
-
-from backend.app.db import SessionLocal, SecurityEvent, Incident
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-POLICY_PATH = BASE_DIR / "policies" / "default_policy.yaml"
-
-try:
-    with open(POLICY_PATH, "r", encoding="utf-8") as f:
-        POLICY = yaml.safe_load(f) or {}
-    POLICY_LOADED = True
-except Exception as e:
-    print("Failed to load policy file:", e)
-    POLICY = {}
-    POLICY_LOADED = False
-
-INJECTION_PATTERNS = POLICY.get("blocked_patterns", [
-    "ignore previous instructions",
-    "reveal system prompt",
-    "jailbreak",
-    "bypass",
-])
-
-EXFIL_PATTERNS = POLICY.get("exfiltration_patterns", [
-    "api key",
-    "password",
-    "token",
-    "secret",
-])
-
-OUTPUT_SENSITIVE_PATTERNS = POLICY.get("output_sensitive_patterns", [
-    "api key",
-    "password",
-    "secret",
-    "token",
-    "sk-",
-    "bearer",
-    "private key",
-])
-
-OUTPUT_ACTION = POLICY.get("output_action", "redact")
-
-ALLOWED_TOOLS = set(POLICY.get("allowed_tools", ["calculator", "notes_store"]))
-ROLE_CONFIG = POLICY.get("roles", {})
-
-BLOCK_THRESHOLD = POLICY.get("block_threshold", 60)
-
-RISK_SCORES = POLICY.get("risk_scores", {
-    "prompt_injection": 60,
-    "exfiltration": 60,
-    "tool_abuse": 80,
-    "role_violation": 70,
-    "output_leakage": 75,
-})
+from typing import Dict, Any, List
 
 
-def severity_from_risk(risk: int) -> str:
-    if risk >= 85:
-        return "critical"
-    if risk >= 60:
-        return "high"
-    if risk >= 30:
-        return "medium"
-    return "low"
+PROMPT_INJECTION_PATTERNS = [
+    r"ignore (all|previous|prior) instructions",
+    r"reveal (the )?(system prompt|hidden prompt|developer message)",
+    r"developer message",
+    r"system prompt",
+    r"bypass security",
+    r"disable safety",
+    r"forget previous instructions",
+    r"override rules",
+    r"jailbreak",
+    r"dump password",
+    r"show me the api key",
+    r"leak (credentials|secrets|tokens|passwords)",
+]
+
+SECRET_PATTERNS = [
+    r"sk-[A-Za-z0-9]{20,}",
+    r"api[_\- ]?key",
+    r"access[_\- ]?token",
+    r"secret[_\- ]?key",
+    r"password",
+    r"private[_\- ]?key",
+    r"bearer\s+[A-Za-z0-9\-_\.]+",
+]
+
+PII_PATTERNS = [
+    r"\b\d{10}\b",
+    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+    r"\b\d{12}\b",
+]
+
+BLOCKED_TOOLS = {"shell", "terminal", "filesystem_delete", "db_admin"}
+HIGH_RISK_TOOLS = {"webhook", "filesystem_write", "external_api", "email_send"}
 
 
-def risk_score(text: str) -> int:
-    t = (text or "").lower()
-    score = 0
+def _match_patterns(text: str, patterns: List[str]) -> List[str]:
+    matches = []
+    lower_text = text.lower()
 
-    if any(p in t for p in INJECTION_PATTERNS):
-        score += RISK_SCORES.get("prompt_injection", 60)
+    for pattern in patterns:
+        if re.search(pattern, lower_text, flags=re.IGNORECASE):
+            matches.append(pattern)
 
-    if any(p in t for p in EXFIL_PATTERNS):
-        score += RISK_SCORES.get("exfiltration", 60)
-
-    return min(score, 100)
+    return matches
 
 
-def is_tool_allowed_for_role(role: str, tool_name: str) -> bool:
-    role_policy = ROLE_CONFIG.get(role, {})
-    allowed_tools = set(role_policy.get("allowed_tools", []))
-    return tool_name in allowed_tools
+def analyze_prompt(text: str) -> Dict[str, Any]:
+    prompt = text or ""
+    matched_injection = _match_patterns(prompt, PROMPT_INJECTION_PATTERNS)
+    matched_secrets = _match_patterns(prompt, SECRET_PATTERNS)
+    matched_pii = _match_patterns(prompt, PII_PATTERNS)
 
+    risk = 0
+    reasons = []
 
-def create_incident_if_needed(
-    app_id: str,
-    role: str,
-    event_type: str,
-    severity: str,
-    tool: str,
-    reason: str,
-    risk: int,
-    goal: str,
-):
-    if severity not in {"high", "critical"}:
-        return
+    if matched_injection:
+        risk += 50
+        reasons.append("Prompt injection indicators detected")
 
-    if event_type not in {"PROMPT_BLOCKED", "TOOL_BLOCKED", "OUTPUT_BLOCKED", "OUTPUT_REDACTED"}:
-        return
+    if matched_secrets:
+        risk += 30
+        reasons.append("Secret extraction indicators detected")
 
-    db = SessionLocal()
-    try:
-        incident = Incident(
-            app_id=app_id,
-            role=role,
-            event_type=event_type,
-            severity=severity,
-            tool=tool,
-            reason=reason,
-            risk=risk,
-            goal=goal,
-            status="open",
-        )
-        db.add(incident)
-        db.commit()
-    finally:
-        db.close()
+    if matched_pii:
+        risk += 20
+        reasons.append("Possible PII pattern detected")
 
+    severity = "low"
+    if risk >= 80:
+        severity = "critical"
+    elif risk >= 60:
+        severity = "high"
+    elif risk >= 30:
+        severity = "medium"
 
-def log_event(
-    event_type: str,
-    goal: str,
-    tool: str = "",
-    reason: str = "",
-    risk: int = 0,
-    app_id: str = "default-app",
-    role: str = "user",
-):
-    severity = severity_from_risk(risk)
-
-    db = SessionLocal()
-    try:
-        db.add(
-            SecurityEvent(
-                app_id=app_id,
-                role=role,
-                event_type=event_type,
-                severity=severity,
-                tool=tool,
-                reason=reason,
-                risk=risk,
-                goal=goal,
-            )
-        )
-        db.commit()
-    finally:
-        db.close()
-
-    create_incident_if_needed(
-        app_id=app_id,
-        role=role,
-        event_type=event_type,
-        severity=severity,
-        tool=tool,
-        reason=reason,
-        risk=risk,
-        goal=goal,
-    )
-
-
-def allow_tool_call(goal: str, tool_name: str, role: str = "user"):
-    if tool_name not in ALLOWED_TOOLS:
-        return False, "Tool not allowlisted globally", RISK_SCORES.get("tool_abuse", 80)
-
-    if not is_tool_allowed_for_role(role, tool_name):
-        return False, f"Role '{role}' is not permitted to use tool '{tool_name}'", RISK_SCORES.get("role_violation", 70)
-
-    r = risk_score(goal)
-    if r >= BLOCK_THRESHOLD:
-        return False, "High-risk goal detected", r
-
-    return True, "Allowed", r
-
-
-def inspect_output(output, app_id: str, role: str, tool: str, goal: str):
-    """
-    Returns:
-      {
-        "status": "safe" | "redacted" | "blocked",
-        "output": ...,
-        "reason": "...",
-        "risk": int
-      }
-    """
-    output_text = str(output).lower()
-
-    matched = [p for p in OUTPUT_SENSITIVE_PATTERNS if p in output_text]
-    if not matched:
-        return {
-            "status": "safe",
-            "output": output,
-            "reason": "Output passed inspection",
-            "risk": 0,
-        }
-
-    risk = RISK_SCORES.get("output_leakage", 75)
-    reason = f"Sensitive output detected: {', '.join(matched)}"
-
-    if OUTPUT_ACTION == "block":
-        log_event(
-            event_type="OUTPUT_BLOCKED",
-            goal=goal,
-            tool=tool,
-            reason=reason,
-            risk=risk,
-            app_id=app_id,
-            role=role,
-        )
-        return {
-            "status": "blocked",
-            "output": "[BLOCKED: sensitive output detected]",
-            "reason": reason,
-            "risk": risk,
-        }
-
-    redacted = str(output)
-    for pattern in matched:
-        redacted = re.sub(re.escape(pattern), "[REDACTED]", redacted, flags=re.IGNORECASE)
-
-    log_event(
-        event_type="OUTPUT_REDACTED",
-        goal=goal,
-        tool=tool,
-        reason=reason,
-        risk=risk,
-        app_id=app_id,
-        role=role,
-    )
+    blocked = risk >= 60
 
     return {
-        "status": "redacted",
-        "output": redacted,
-        "reason": reason,
-        "risk": risk,
+        "blocked": blocked,
+        "risk": min(risk, 100),
+        "severity": severity,
+        "reasons": reasons,
+        "matches": {
+            "prompt_injection": matched_injection,
+            "secrets": matched_secrets,
+            "pii": matched_pii,
+        },
     }
 
 
-def get_policy_status():
+def evaluate_tool_use(tool_name: str) -> Dict[str, Any]:
+    tool = (tool_name or "").strip().lower()
+
+    if tool in BLOCKED_TOOLS:
+        return {
+            "allowed": False,
+            "risk": 90,
+            "severity": "critical",
+            "reason": f"Tool '{tool}' is blocked by policy",
+        }
+
+    if tool in HIGH_RISK_TOOLS:
+        return {
+            "allowed": True,
+            "risk": 50,
+            "severity": "medium",
+            "reason": f"Tool '{tool}' is high-risk and must be monitored",
+        }
+
     return {
-        "policy_loaded": POLICY_LOADED,
-        "policy_path": str(POLICY_PATH),
-        "blocked_patterns_count": len(INJECTION_PATTERNS),
-        "exfiltration_patterns_count": len(EXFIL_PATTERNS),
-        "output_sensitive_patterns_count": len(OUTPUT_SENSITIVE_PATTERNS),
-        "output_action": OUTPUT_ACTION,
-        "allowed_tools": sorted(list(ALLOWED_TOOLS)),
-        "roles": ROLE_CONFIG,
-        "block_threshold": BLOCK_THRESHOLD,
-        "risk_scores": RISK_SCORES,
+        "allowed": True,
+        "risk": 5,
+        "severity": "low",
+        "reason": f"Tool '{tool}' allowed",
+    }
+
+
+def inspect_output(text: str) -> Dict[str, Any]:
+    output = text or ""
+    matched_secrets = _match_patterns(output, SECRET_PATTERNS)
+    matched_pii = _match_patterns(output, PII_PATTERNS)
+
+    risk = 0
+    reasons = []
+    redactions = []
+
+    if matched_secrets:
+        risk += 50
+        reasons.append("Sensitive secret-like content detected in output")
+        redactions.extend(matched_secrets)
+
+    if matched_pii:
+        risk += 25
+        reasons.append("Possible PII detected in output")
+        redactions.extend(matched_pii)
+
+    severity = "low"
+    if risk >= 70:
+        severity = "high"
+    elif risk >= 30:
+        severity = "medium"
+
+    should_block = risk >= 70
+    should_redact = 30 <= risk < 70
+
+    safe_output = output
+    if should_redact:
+        for pattern in SECRET_PATTERNS + PII_PATTERNS:
+            safe_output = re.sub(pattern, "[REDACTED]", safe_output, flags=re.IGNORECASE)
+
+    return {
+        "blocked": should_block,
+        "redacted": should_redact,
+        "risk": min(risk, 100),
+        "severity": severity,
+        "reasons": reasons,
+        "safe_output": safe_output,
+    }
+
+
+def get_policy_status() -> Dict[str, Any]:
+    return {
+        "prompt_injection_detection": "enabled",
+        "secret_leak_detection": "enabled",
+        "pii_detection": "enabled",
+        "tool_policy_enforcement": "enabled",
+        "blocked_tools": sorted(BLOCKED_TOOLS),
+        "high_risk_tools": sorted(HIGH_RISK_TOOLS),
     }
