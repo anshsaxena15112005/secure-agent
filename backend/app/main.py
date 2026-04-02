@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional
 import csv
 import io
+import yaml
 
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
@@ -12,6 +13,7 @@ from backend.app.db import init_db, SessionLocal, SecurityEvent, Incident
 from backend.app.agent.planner import plan_task
 from backend.app.agent.executor import execute_plan
 from backend.app.security import get_policy_status
+from backend.app.policy_loader import get_policy, read_policy_text, write_policy_text, reload_policy
 from backend.security.auth import (
     authenticate_user,
     create_access_token,
@@ -35,6 +37,10 @@ class AgentRequest(BaseModel):
     goal: str
     app_id: str = "default-app"
     role: str = "user"
+
+
+class PolicyUpdateRequest(BaseModel):
+    content: str
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -98,6 +104,11 @@ def incidents_page():
 @app.get("/reports", response_class=HTMLResponse)
 def reports_page():
     return (Path(__file__).resolve().parent / "reports.html").read_text(encoding="utf-8")
+
+
+@app.get("/policy-editor", response_class=HTMLResponse)
+def policy_editor_page():
+    return (Path(__file__).resolve().parent / "policy_editor.html").read_text(encoding="utf-8")
 
 
 # ---------- AUTH ----------
@@ -328,6 +339,45 @@ def resolve_incident(
 @app.get("/policy/status")
 def policy_status(current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))):
     return get_policy_status()
+
+
+@app.get("/security/policy")
+def get_security_policy(current_user=Depends(require_platform_roles("admin", "analyst", "auditor"))):
+    return get_policy()
+
+
+@app.get("/security/policy/raw")
+def get_security_policy_raw(current_user=Depends(require_platform_roles("admin"))):
+    return {
+        "content": read_policy_text()
+    }
+
+
+@app.post("/security/policy/reload")
+def reload_security_policy(current_user=Depends(require_platform_roles("admin"))):
+    policy = reload_policy()
+    return {
+        "message": "Policy reloaded successfully",
+        "policy": policy
+    }
+
+
+@app.post("/security/policy/update")
+def update_security_policy(
+    request: PolicyUpdateRequest,
+    current_user=Depends(require_platform_roles("admin"))
+):
+    try:
+        yaml.safe_load(request.content)
+    except yaml.YAMLError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
+
+    updated = write_policy_text(request.content)
+
+    return {
+        "message": "Policy updated successfully",
+        "policy": updated
+    }
 
 
 @app.get("/security/stats")

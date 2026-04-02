@@ -1,51 +1,68 @@
-blocked_patterns:
+prompt_injection_patterns:
   - ignore previous instructions
   - reveal system prompt
   - jailbreak
   - bypass
   - developer message
+  - disable safety
+  - override rules
 
-exfiltration_patterns:
+secret_patterns:
   - api key
   - password
   - token
   - secret
-
-output_sensitive_patterns:
-  - api key
-  - password
-  - secret
-  - token
-  - sk-
   - bearer
   - private key
+  - sk-
+
+pii_patterns:
+  - '\b\d{10}\b'
+  - '\b\d{12}\b'
+  - '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+
+blocked_tools:
+  - shell
+  - terminal
+  - filesystem_delete
+  - db_admin
+
+high_risk_tools:
+  - webhook
+  - filesystem_write
+  - external_api
+  - email_send
+
+risk_thresholds:
+  block: 60
+  incident: 60
+  critical: 80
 
 output_action: redact
 
-allowed_tools:
-  - calculator
-  - notes_store
-  - demo_leak
-
 roles:
-  user:
-    allowed_tools:
-      - calculator
-
   admin:
     allowed_tools:
       - calculator
       - notes_store
       - demo_leak
+      - email_send
+      - external_api
+      - filesystem_write
+
+  analyst:
+    allowed_tools:
+      - calculator
+      - notes_store
+      - email_send
+      - external_api
 
   auditor:
-    allowed_tools: []
+    allowed_tools:
+      - calculator
+      - notes_store
 
-block_threshold: 60
-
-risk_scores:
-  prompt_injection: 60
-  exfiltration: 60
-  tool_abuse: 80
-  role_violation: 70
-  output_leakage: 75
+  user:
+    allowed_tools:
+      - calculator
+      - notes_store

@@ -12,6 +12,8 @@ def plan_task(goal: str):
         tool = "filesystem_delete"
     elif any(word in text for word in ["run shell", "terminal", "command line", "bash"]):
         tool = "shell"
+    elif any(word in text for word in ["webhook", "callback url"]):
+        tool = "webhook"
 
     return {
         "goal": goal,

@@ -1,51 +1,49 @@
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
+from backend.app.policy_loader import get_policy
 
-PROMPT_INJECTION_PATTERNS = [
-    r"ignore (all|previous|prior) instructions",
-    r"reveal (the )?(system prompt|hidden prompt|developer message)",
-    r"developer message",
-    r"system prompt",
-    r"bypass security",
-    r"disable safety",
-    r"forget previous instructions",
-    r"override rules",
-    r"jailbreak",
-    r"dump password",
-    r"show me the api key",
-    r"leak (credentials|secrets|tokens|passwords)",
-]
+policy = get_policy()
 
-SECRET_PATTERNS = [
-    r"sk-[A-Za-z0-9]{20,}",
-    r"api[_\- ]?key",
-    r"access[_\- ]?token",
-    r"secret[_\- ]?key",
-    r"password",
-    r"private[_\- ]?key",
-    r"bearer\s+[A-Za-z0-9\-_\.]+",
-]
+PROMPT_INJECTION_PATTERNS = policy.get("prompt_injection_patterns", [])
+SECRET_PATTERNS = policy.get("secret_patterns", [])
+PII_PATTERNS = policy.get("pii_patterns", [])
 
-PII_PATTERNS = [
-    r"\b\d{10}\b",
-    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
-    r"\b\d{12}\b",
-]
+BLOCKED_TOOLS = set(policy.get("blocked_tools", []))
+HIGH_RISK_TOOLS = set(policy.get("high_risk_tools", []))
 
-BLOCKED_TOOLS = {"shell", "terminal", "filesystem_delete", "db_admin"}
-HIGH_RISK_TOOLS = {"webhook", "filesystem_write", "external_api", "email_send"}
+RISK_CONFIG = policy.get("risk_thresholds", {})
+BLOCK_THRESHOLD = RISK_CONFIG.get("block", 60)
+CRITICAL_THRESHOLD = RISK_CONFIG.get("critical", 80)
+OUTPUT_BLOCK_THRESHOLD = RISK_CONFIG.get("output_block", 70)
+OUTPUT_REDACT_THRESHOLD = RISK_CONFIG.get("output_redact", 30)
+
+ROLE_POLICIES = policy.get("roles", {})
 
 
 def _match_patterns(text: str, patterns: List[str]) -> List[str]:
     matches = []
-    lower_text = text.lower()
+    source_text = text or ""
 
     for pattern in patterns:
-        if re.search(pattern, lower_text, flags=re.IGNORECASE):
-            matches.append(pattern)
+        try:
+            if re.search(pattern, source_text, flags=re.IGNORECASE):
+                matches.append(pattern)
+        except re.error:
+            if pattern.lower() in source_text.lower():
+                matches.append(pattern)
 
     return matches
+
+
+def _calculate_severity(risk: int) -> str:
+    if risk >= CRITICAL_THRESHOLD:
+        return "critical"
+    if risk >= BLOCK_THRESHOLD:
+        return "high"
+    if risk >= 30:
+        return "medium"
+    return "low"
 
 
 def analyze_prompt(text: str) -> Dict[str, Any]:
@@ -69,19 +67,13 @@ def analyze_prompt(text: str) -> Dict[str, Any]:
         risk += 20
         reasons.append("Possible PII pattern detected")
 
-    severity = "low"
-    if risk >= 80:
-        severity = "critical"
-    elif risk >= 60:
-        severity = "high"
-    elif risk >= 30:
-        severity = "medium"
-
-    blocked = risk >= 60
+    risk = min(risk, 100)
+    severity = _calculate_severity(risk)
+    blocked = risk >= BLOCK_THRESHOLD
 
     return {
         "blocked": blocked,
-        "risk": min(risk, 100),
+        "risk": risk,
         "severity": severity,
         "reasons": reasons,
         "matches": {
@@ -92,8 +84,9 @@ def analyze_prompt(text: str) -> Dict[str, Any]:
     }
 
 
-def evaluate_tool_use(tool_name: str) -> Dict[str, Any]:
+def evaluate_tool_use(tool_name: str, role: Optional[str] = None) -> Dict[str, Any]:
     tool = (tool_name or "").strip().lower()
+    user_role = (role or "").strip().lower()
 
     if tool in BLOCKED_TOOLS:
         return {
@@ -102,6 +95,18 @@ def evaluate_tool_use(tool_name: str) -> Dict[str, Any]:
             "severity": "critical",
             "reason": f"Tool '{tool}' is blocked by policy",
         }
+
+    if user_role:
+        role_config = ROLE_POLICIES.get(user_role, {})
+        allowed_tools = set(role_config.get("allowed_tools", []))
+
+        if allowed_tools and tool not in allowed_tools and tool != "none":
+            return {
+                "allowed": False,
+                "risk": 75,
+                "severity": "high",
+                "reason": f"Tool '{tool}' is not allowed for role '{user_role}'",
+            }
 
     if tool in HIGH_RISK_TOOLS:
         return {
@@ -126,36 +131,39 @@ def inspect_output(text: str) -> Dict[str, Any]:
 
     risk = 0
     reasons = []
-    redactions = []
 
     if matched_secrets:
         risk += 50
         reasons.append("Sensitive secret-like content detected in output")
-        redactions.extend(matched_secrets)
 
     if matched_pii:
         risk += 25
         reasons.append("Possible PII detected in output")
-        redactions.extend(matched_pii)
 
-    severity = "low"
-    if risk >= 70:
+    risk = min(risk, 100)
+
+    if risk >= OUTPUT_BLOCK_THRESHOLD:
         severity = "high"
-    elif risk >= 30:
+    elif risk >= OUTPUT_REDACT_THRESHOLD:
         severity = "medium"
+    else:
+        severity = "low"
 
-    should_block = risk >= 70
-    should_redact = 30 <= risk < 70
+    should_block = risk >= OUTPUT_BLOCK_THRESHOLD
+    should_redact = OUTPUT_REDACT_THRESHOLD <= risk < OUTPUT_BLOCK_THRESHOLD
 
     safe_output = output
     if should_redact:
         for pattern in SECRET_PATTERNS + PII_PATTERNS:
-            safe_output = re.sub(pattern, "[REDACTED]", safe_output, flags=re.IGNORECASE)
+            try:
+                safe_output = re.sub(pattern, "[REDACTED]", safe_output, flags=re.IGNORECASE)
+            except re.error:
+                safe_output = safe_output.replace(pattern, "[REDACTED]")
 
     return {
         "blocked": should_block,
         "redacted": should_redact,
-        "risk": min(risk, 100),
+        "risk": risk,
         "severity": severity,
         "reasons": reasons,
         "safe_output": safe_output,
@@ -170,4 +178,11 @@ def get_policy_status() -> Dict[str, Any]:
         "tool_policy_enforcement": "enabled",
         "blocked_tools": sorted(BLOCKED_TOOLS),
         "high_risk_tools": sorted(HIGH_RISK_TOOLS),
+        "risk_thresholds": {
+            "block": BLOCK_THRESHOLD,
+            "critical": CRITICAL_THRESHOLD,
+            "output_block": OUTPUT_BLOCK_THRESHOLD,
+            "output_redact": OUTPUT_REDACT_THRESHOLD,
+        },
+        "roles": ROLE_POLICIES,
     }

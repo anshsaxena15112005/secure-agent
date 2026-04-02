@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SecureAgent Policy Editor</title>
+    <style>
+        :root {
+            --bg: #0f1419;
+            --panel: rgba(24, 32, 39, 0.92);
+            --panel-2: rgba(255,255,255,0.03);
+            --line: rgba(173, 191, 204, 0.12);
+            --text: #e6edf2;
+            --muted: #93a3af;
+            --shadow: 0 20px 50px rgba(0,0,0,0.22);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
+                linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            border-right: 1px solid var(--line);
+            background: rgba(12, 17, 21, 0.72);
+            backdrop-filter: blur(10px);
+            padding: 24px 18px;
+        }
+
+        .brand {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .brand-sub {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 26px;
+        }
+
+        .nav {
+            display: grid;
+            gap: 10px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: var(--text);
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid transparent;
+            background: transparent;
+            transition: 0.18s ease;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            background: var(--panel-2);
+            border-color: var(--line);
+        }
+
+        .main {
+            padding: 28px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+        }
+
+        .topbar h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .topbar p {
+            margin: 6px 0 0;
+            color: var(--muted);
+        }
+
+        .user-box {
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            font-size: 14px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .toolbar button:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 520px;
+            resize: vertical;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.03);
+            color: var(--text);
+            padding: 16px;
+            border-radius: 14px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .status {
+            min-height: 24px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .hint {
+            margin-bottom: 14px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        @media (max-width: 760px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid var(--line);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">SecureAgent</div>
+            <div class="brand-sub">AI Runtime Security Platform</div>
+
+            <nav class="nav">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/testing">Testing</a>
+                <a href="/incidents">Incidents</a>
+                <a href="/reports">Reports</a>
+                <a href="/policy-editor" class="active">Policy Editor</a>
+                <a href="#" onclick="logout()">Logout</a>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <div class="topbar">
+                <div>
+                    <h1>Policy Editor</h1>
+                    <p>Edit and reload SecureAgent YAML policy configuration</p>
+                </div>
+
+                <div class="user-box">
+                    <div><strong id="current-username">Loading...</strong></div>
+                    <div id="current-role" class="muted">Checking access</div>
+                </div>
+            </div>
+
+            <section class="card">
+                <div class="hint">
+                    Only admin users should update policy. Invalid YAML will be rejected.
+                </div>
+
+                <div class="toolbar">
+                    <button onclick="loadPolicy()">Load Policy</button>
+                    <button onclick="savePolicy()">Save Policy</button>
+                    <button onclick="reloadPolicyOnly()">Reload Policy</button>
+                </div>
+
+                <textarea id="policy-content" placeholder="Policy YAML will appear here..."></textarea>
+                <div class="status" id="status-msg"></div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const TOKEN_KEY = "secureagent_token";
+        const USER_KEY = "secureagent_user";
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY);
+        }
+
+        function getAuthHeaders(json = false) {
+            const token = getToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            if (json) headers["Content-Type"] = "application/json";
+            return headers;
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            window.location.href = "/login";
+        }
+
+        function setStatus(message) {
+            document.getElementById("status-msg").textContent = message;
+        }
+
+        async function ensureLoggedIn() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = "/login";
+                return false;
+            }
+
+            try {
+                const response = await fetch("/auth/me", {
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    logout();
+                    return false;
+                }
+
+                const user = await response.json();
+                document.getElementById("current-username").textContent = user.username;
+                document.getElementById("current-role").textContent = user.role;
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+                if (user.role !== "admin") {
+                    setStatus("Policy editing is restricted to admin users.");
+                }
+
+                return user;
+            } catch (error) {
+                logout();
+                return false;
+            }
+        }
+
+        async function loadPolicy() {
+            setStatus("Loading policy...");
+
+            try {
+                const response = await fetch("/security/policy/raw", {
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus(data.detail || "Failed to load policy.");
+                    return;
+                }
+
+                document.getElementById("policy-content").value = data.content || "";
+                setStatus("Policy loaded successfully.");
+            } catch (error) {
+                setStatus("Unable to connect to the server.");
+            }
+        }
+
+        async function savePolicy() {
+            const content = document.getElementById("policy-content").value;
+
+            setStatus("Saving policy...");
+
+            try {
+                const response = await fetch("/security/policy/update", {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({ content })
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus(data.detail || "Failed to save policy.");
+                    return;
+                }
+
+                setStatus("Policy updated successfully.");
+            } catch (error) {
+                setStatus("Unable to connect to the server.");
+            }
+        }
+
+        async function reloadPolicyOnly() {
+            setStatus("Reloading policy...");
+
+            try {
+                const response = await fetch("/security/policy/reload", {
+                    method: "POST",
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus(data.detail || "Failed to reload policy.");
+                    return;
+                }
+
+                setStatus("Policy reloaded successfully.");
+            } catch (error) {
+                setStatus("Unable to connect to the server.");
+            }
+        }
+
+        async function initPage() {
+            const user = await ensureLoggedIn();
+            if (!user) return;
+            if (user.role === "admin") {
+                loadPolicy();
+            }
+        }
+
+        initPage();
+    </script>
+</body>
+</html>

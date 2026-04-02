@@ -1,4 +1,5 @@
 from backend.app.security import analyze_prompt, evaluate_tool_use, inspect_output
+from backend.app.policy_loader import get_policy
 from backend.app.db import SessionLocal, SecurityEvent, Incident
 
 
@@ -12,6 +13,9 @@ def log_event(
     risk: int,
     goal: str,
 ):
+    policy = get_policy()
+    incident_threshold = policy.get("risk_thresholds", {}).get("incident", 60)
+
     db = SessionLocal()
     try:
         event = SecurityEvent(
@@ -27,7 +31,7 @@ def log_event(
         db.add(event)
         db.commit()
 
-        if severity in {"high", "critical"} or risk >= 60:
+        if risk >= incident_threshold:
             incident = Incident(
                 app_id=app_id,
                 role=role,
@@ -72,7 +76,7 @@ def execute_plan(plan, app_id="default-app", role="user"):
             "matches": prompt_check["matches"],
         }
 
-    tool_check = evaluate_tool_use(tool)
+    tool_check = evaluate_tool_use(tool, role=role)
     if not tool_check["allowed"]:
         log_event(
             app_id=app_id,
@@ -103,7 +107,7 @@ def execute_plan(plan, app_id="default-app", role="user"):
             event_type="OUTPUT_BLOCKED",
             severity=output_check["severity"],
             tool=tool,
-            reason="; ".join(output_check["reasons"]),
+            reason="; ".join(output_check["reasons"]) or "Output blocked by policy",
             risk=output_check["risk"],
             goal=goal,
         )
@@ -112,7 +116,7 @@ def execute_plan(plan, app_id="default-app", role="user"):
             "stage": "output",
             "risk": output_check["risk"],
             "severity": output_check["severity"],
-            "reason": "; ".join(output_check["reasons"]),
+            "reason": "; ".join(output_check["reasons"]) or "Output blocked by policy",
         }
 
     if output_check["redacted"]:
@@ -122,7 +126,7 @@ def execute_plan(plan, app_id="default-app", role="user"):
             event_type="OUTPUT_REDACTED",
             severity=output_check["severity"],
             tool=tool,
-            reason="; ".join(output_check["reasons"]),
+            reason="; ".join(output_check["reasons"]) or "Output redacted by policy",
             risk=output_check["risk"],
             goal=goal,
         )
@@ -132,17 +136,19 @@ def execute_plan(plan, app_id="default-app", role="user"):
             "risk": output_check["risk"],
             "severity": output_check["severity"],
             "message": "Output redacted for safety",
+            "tool": tool,
             "output": output_check["safe_output"],
         }
 
     combined_risk = max(prompt_check["risk"], tool_check["risk"])
-    combined_severity = "low"
     if combined_risk >= 80:
         combined_severity = "critical"
     elif combined_risk >= 60:
         combined_severity = "high"
     elif combined_risk >= 30:
         combined_severity = "medium"
+    else:
+        combined_severity = "low"
 
     log_event(
         app_id=app_id,
