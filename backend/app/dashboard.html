@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,7 +10,7 @@
             --bg: #0f1419;
             --bg-2: #151c22;
             --panel: rgba(24, 32, 39, 0.92);
-            --panel-2: rgba(255,255,255,0.03);
+            --panel-2: rgba(255, 255, 255, 0.03);
             --line: rgba(173, 191, 204, 0.12);
             --text: #e6edf2;
             --muted: #93a3af;
@@ -18,7 +19,7 @@
             --success: #4fa36c;
             --warning: #d7a54b;
             --danger: #d46a6a;
-            --shadow: 0 20px 50px rgba(0,0,0,0.22);
+            --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
         }
 
         * {
@@ -30,7 +31,7 @@
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
+                radial-gradient(circle at top left, rgba(110, 162, 157, 0.06), transparent 20%),
                 linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
         }
 
@@ -163,7 +164,8 @@
             border-collapse: collapse;
         }
 
-        th, td {
+        th,
+        td {
             text-align: left;
             padding: 12px 10px;
             border-bottom: 1px solid var(--line);
@@ -184,10 +186,25 @@
             font-weight: 700;
         }
 
-        .low { background: rgba(79,163,108,0.15); color: #8dd4a1; }
-        .medium { background: rgba(215,165,75,0.16); color: #e8c374; }
-        .high { background: rgba(212,106,106,0.16); color: #ef9b9b; }
-        .critical { background: rgba(255,80,80,0.18); color: #ff9a9a; }
+        .low {
+            background: rgba(79, 163, 108, 0.15);
+            color: #8dd4a1;
+        }
+
+        .medium {
+            background: rgba(215, 165, 75, 0.16);
+            color: #e8c374;
+        }
+
+        .high {
+            background: rgba(212, 106, 106, 0.16);
+            color: #ef9b9b;
+        }
+
+        .critical {
+            background: rgba(255, 80, 80, 0.18);
+            color: #ff9a9a;
+        }
 
         .list {
             display: grid;
@@ -198,7 +215,7 @@
             padding: 14px;
             border: 1px solid var(--line);
             border-radius: 16px;
-            background: rgba(255,255,255,0.025);
+            background: rgba(255, 255, 255, 0.025);
         }
 
         .alert-head {
@@ -236,7 +253,7 @@
         }
 
         .toolbar button:hover {
-            background: rgba(255,255,255,0.04);
+            background: rgba(255, 255, 255, 0.04);
         }
 
         @media (max-width: 1100px) {
@@ -265,6 +282,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -272,10 +290,14 @@
             <div class="brand-sub">AI Runtime Security Platform</div>
 
             <nav class="nav">
-                <a href="/dashboard" class="active">Dashboard</a>
+                <a href="/dashboard">Dashboard</a>
                 <a href="/testing">Testing</a>
                 <a href="/incidents">Incidents</a>
                 <a href="/reports">Reports</a>
+
+                <!-- Admin only -->
+                <a href="/policy-editor" id="policy-link" hidden>Policy Editor</a>
+
                 <a href="#" onclick="logout()">Logout</a>
             </nav>
         </aside>
@@ -365,9 +387,11 @@
             return localStorage.getItem(TOKEN_KEY);
         }
 
-        function getAuthHeaders() {
+        function getAuthHeaders(json = false) {
             const token = getToken();
-            return token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            if (json) headers["Content-Type"] = "application/json";
+            return headers;
         }
 
         function logout() {
@@ -394,156 +418,31 @@
                 }
 
                 const user = await response.json();
-                document.getElementById("current-username").textContent = user.username;
-                document.getElementById("current-role").textContent = user.role;
+
+                const usernameEl = document.getElementById("current-username");
+                const roleEl = document.getElementById("current-role");
+
+                if (usernameEl) usernameEl.textContent = user.username;
+                if (roleEl) roleEl.textContent = user.role;
+
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
-                return true;
+
+                // 🔐 Admin-only Policy Editor
+                const policyLink = document.getElementById("policy-link");
+                if (policyLink) {
+                    policyLink.hidden = user.role !== "admin";
+                }
+
+                return user;
+
             } catch (error) {
                 logout();
                 return false;
             }
         }
 
-        function formatTime(value) {
-            if (!value) return "-";
-            const date = new Date(value);
-            if (Number.isNaN(date.getTime())) return value;
-            return date.toLocaleString();
-        }
-
-        function severityClass(severity) {
-            const s = (severity || "low").toLowerCase();
-            if (["low", "medium", "high", "critical"].includes(s)) return s;
-            return "low";
-        }
-
-        function renderStats(stats) {
-            document.getElementById("total-events").textContent = stats.total_events ?? 0;
-            document.getElementById("blocked-events").textContent = stats.blocked_events ?? 0;
-            document.getElementById("allowed-events").textContent = stats.allowed_events ?? 0;
-            document.getElementById("high-risk-events").textContent = stats.high_risk_events ?? 0;
-        }
-
-        function renderEvents(events) {
-            const body = document.getElementById("events-body");
-
-            if (!events || events.length === 0) {
-                body.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="empty">No events found.</td>
-                    </tr>
-                `;
-                return;
-            }
-
-            body.innerHTML = events.map(event => `
-                <tr>
-                    <td>${formatTime(event.timestamp)}</td>
-                    <td>${event.event_type || "-"}</td>
-                    <td><span class="pill ${severityClass(event.severity)}">${event.severity || "low"}</span></td>
-                    <td>${event.tool || "-"}</td>
-                    <td>${event.reason || "-"}</td>
-                </tr>
-            `).join("");
-        }
-
-        function renderAlerts(alerts) {
-            const list = document.getElementById("alerts-list");
-
-            if (!alerts || alerts.length === 0) {
-                list.innerHTML = `<div class="empty">No active alerts.</div>`;
-                return;
-            }
-
-            list.innerHTML = alerts.map(alert => `
-                <div class="alert-item">
-                    <div class="alert-head">
-                        <strong>${alert.event_type || "Unknown Alert"}</strong>
-                        <span class="pill ${severityClass(alert.severity)}">${alert.severity || "low"}</span>
-                    </div>
-                    <div class="muted"><strong>Tool:</strong> ${alert.tool || "-"}</div>
-                    <div class="muted"><strong>Risk:</strong> ${alert.risk ?? "-"}</div>
-                    <div style="margin-top:8px;">${alert.reason || "No reason available."}</div>
-                </div>
-            `).join("");
-        }
-
-        async function fetchJson(url) {
-            const response = await fetch(url, {
-                headers: getAuthHeaders()
-            });
-
-            if (response.status === 401) {
-                logout();
-                throw new Error("Unauthorized");
-            }
-
-            if (!response.ok) {
-                throw new Error(`Request failed: ${url}`);
-            }
-
-            return response.json();
-        }
-
-        async function loadDashboard() {
-            try {
-                const ok = await ensureLoggedIn();
-                if (!ok) return;
-
-                const [stats, events, alerts] = await Promise.all([
-                    fetchJson("/security/stats"),
-                    fetchJson("/events?limit=8"),
-                    fetchJson("/alerts?limit=5")
-                ]);
-
-                renderStats(stats);
-                renderEvents(events);
-                renderAlerts(alerts);
-            } catch (error) {
-                document.getElementById("events-body").innerHTML = `
-                    <tr>
-                        <td colspan="5" class="empty">Failed to load dashboard data.</td>
-                    </tr>
-                `;
-                document.getElementById("alerts-list").innerHTML = `
-                    <div class="empty">Failed to load alerts.</div>
-                `;
-            }
-        }
-
-        async function runQuickRedTeam() {
-            try {
-                const response = await fetch("/security/red-team-test", {
-                    method: "POST",
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
-                if (!response.ok) {
-                    alert("Failed to run red-team test.");
-                    return;
-                }
-
-                const data = await response.json();
-                alert(
-                    `Red-team test complete\n\n` +
-                    `Total: ${data.summary.total_tests}\n` +
-                    `Blocked: ${data.summary.blocked}\n` +
-                    `Allowed: ${data.summary.allowed}\n` +
-                    `Errors: ${data.summary.errors}`
-                );
-
-                loadDashboard();
-            } catch (error) {
-                alert("Unable to connect to the server.");
-            }
-        }
-
-        loadDashboard();
+        ensureLoggedIn();
     </script>
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,7 +10,7 @@
             --bg: #0f1419;
             --bg-2: #151c22;
             --panel: rgba(24, 32, 39, 0.92);
-            --panel-2: rgba(255,255,255,0.03);
+            --panel-2: rgba(255, 255, 255, 0.03);
             --line: rgba(173, 191, 204, 0.12);
             --text: #e6edf2;
             --muted: #93a3af;
@@ -18,7 +19,7 @@
             --success: #4fa36c;
             --warning: #d7a54b;
             --danger: #d46a6a;
-            --shadow: 0 20px 50px rgba(0,0,0,0.22);
+            --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
         }
 
         * {
@@ -30,7 +31,7 @@
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
+                radial-gradient(circle at top left, rgba(110, 162, 157, 0.06), transparent 20%),
                 linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
         }
 
@@ -161,7 +162,7 @@
         }
 
         .toolbar button:hover {
-            background: rgba(255,255,255,0.04);
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .section-title {
@@ -178,7 +179,8 @@
             border-collapse: collapse;
         }
 
-        th, td {
+        th,
+        td {
             text-align: left;
             padding: 12px 10px;
             border-bottom: 1px solid var(--line);
@@ -199,14 +201,40 @@
             font-weight: 700;
         }
 
-        .low { background: rgba(79,163,108,0.15); color: #8dd4a1; }
-        .medium { background: rgba(215,165,75,0.16); color: #e8c374; }
-        .high { background: rgba(212,106,106,0.16); color: #ef9b9b; }
-        .critical { background: rgba(255,80,80,0.18); color: #ff9a9a; }
+        .low {
+            background: rgba(79, 163, 108, 0.15);
+            color: #8dd4a1;
+        }
 
-        .open { background: rgba(215,165,75,0.16); color: #e8c374; }
-        .acknowledged { background: rgba(111,143,152,0.18); color: #b7d1d8; }
-        .resolved { background: rgba(79,163,108,0.15); color: #8dd4a1; }
+        .medium {
+            background: rgba(215, 165, 75, 0.16);
+            color: #e8c374;
+        }
+
+        .high {
+            background: rgba(212, 106, 106, 0.16);
+            color: #ef9b9b;
+        }
+
+        .critical {
+            background: rgba(255, 80, 80, 0.18);
+            color: #ff9a9a;
+        }
+
+        .open {
+            background: rgba(215, 165, 75, 0.16);
+            color: #e8c374;
+        }
+
+        .acknowledged {
+            background: rgba(111, 143, 152, 0.18);
+            color: #b7d1d8;
+        }
+
+        .resolved {
+            background: rgba(79, 163, 108, 0.15);
+            color: #8dd4a1;
+        }
 
         .muted {
             color: var(--muted);
@@ -226,7 +254,7 @@
 
         .btn-small {
             border: 1px solid var(--line);
-            background: rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03);
             color: var(--text);
             padding: 8px 10px;
             border-radius: 10px;
@@ -235,7 +263,7 @@
         }
 
         .btn-small:hover {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         @media (max-width: 1100px) {
@@ -260,6 +288,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -269,8 +298,12 @@
             <nav class="nav">
                 <a href="/dashboard">Dashboard</a>
                 <a href="/testing">Testing</a>
-                <a href="/incidents" class="active">Incidents</a>
+                <a href="/incidents">Incidents</a>
                 <a href="/reports">Reports</a>
+
+                <!-- Admin only -->
+                <a href="/policy-editor" id="policy-link" hidden>Policy Editor</a>
+
                 <a href="#" onclick="logout()">Logout</a>
             </nav>
         </aside>
@@ -360,9 +393,11 @@
             return localStorage.getItem(TOKEN_KEY);
         }
 
-        function getAuthHeaders() {
+        function getAuthHeaders(json = false) {
             const token = getToken();
-            return token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            if (json) headers["Content-Type"] = "application/json";
+            return headers;
         }
 
         function logout() {
@@ -389,207 +424,31 @@
                 }
 
                 const user = await response.json();
-                document.getElementById("current-username").textContent = user.username;
-                document.getElementById("current-role").textContent = user.role;
+
+                const usernameEl = document.getElementById("current-username");
+                const roleEl = document.getElementById("current-role");
+
+                if (usernameEl) usernameEl.textContent = user.username;
+                if (roleEl) roleEl.textContent = user.role;
+
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+                // 🔐 Admin-only Policy Editor
+                const policyLink = document.getElementById("policy-link");
+                if (policyLink) {
+                    policyLink.hidden = user.role !== "admin";
+                }
+
                 return user;
+
             } catch (error) {
                 logout();
                 return false;
             }
         }
 
-        function formatTime(value) {
-            if (!value) return "-";
-            const date = new Date(value);
-            if (Number.isNaN(date.getTime())) return value;
-            return date.toLocaleString();
-        }
-
-        function severityClass(severity) {
-            const s = (severity || "low").toLowerCase();
-            if (["low", "medium", "high", "critical"].includes(s)) return s;
-            return "low";
-        }
-
-        function statusClass(status) {
-            const s = (status || "open").toLowerCase();
-            if (["open", "acknowledged", "resolved"].includes(s)) return s;
-            return "open";
-        }
-
-        function getStoredUser() {
-            try {
-                return JSON.parse(localStorage.getItem(USER_KEY) || "{}");
-            } catch {
-                return {};
-            }
-        }
-
-        function canAcknowledge(userRole, incidentStatus) {
-            return ["admin", "analyst"].includes(userRole) && incidentStatus === "open";
-        }
-
-        function canResolve(userRole, incidentStatus) {
-            return userRole === "admin" && incidentStatus !== "resolved";
-        }
-
-        function renderStats(stats) {
-            document.getElementById("total-incidents").textContent = stats.total_incidents ?? 0;
-            document.getElementById("open-incidents").textContent = stats.by_status?.open ?? 0;
-            document.getElementById("ack-incidents").textContent = stats.by_status?.acknowledged ?? 0;
-            document.getElementById("resolved-incidents").textContent = stats.by_status?.resolved ?? 0;
-        }
-
-        function renderIncidents(incidents) {
-            const body = document.getElementById("incidents-body");
-            const user = getStoredUser();
-            const userRole = user.role || "";
-
-            if (!incidents || incidents.length === 0) {
-                body.innerHTML = `
-                    <tr>
-                        <td colspan="8" class="empty">No incidents found.</td>
-                    </tr>
-                `;
-                return;
-            }
-
-            body.innerHTML = incidents.map(incident => {
-                let actions = `<span class="muted">No actions</span>`;
-
-                if (incident.status !== "resolved") {
-                    const buttons = [];
-
-                    if (canAcknowledge(userRole, incident.status)) {
-                        buttons.push(`
-                            <button class="btn-small" onclick="acknowledgeIncident(${incident.id})">
-                                Acknowledge
-                            </button>
-                        `);
-                    }
-
-                    if (canResolve(userRole, incident.status)) {
-                        buttons.push(`
-                            <button class="btn-small" onclick="resolveIncident(${incident.id})">
-                                Resolve
-                            </button>
-                        `);
-                    }
-
-                    if (buttons.length > 0) {
-                        actions = `<div class="action-buttons">${buttons.join("")}</div>`;
-                    }
-                }
-
-                return `
-                    <tr>
-                        <td>#${incident.id}</td>
-                        <td>${formatTime(incident.timestamp)}</td>
-                        <td>${incident.event_type || "-"}</td>
-                        <td><span class="pill ${severityClass(incident.severity)}">${incident.severity || "low"}</span></td>
-                        <td><span class="pill ${statusClass(incident.status)}">${incident.status || "open"}</span></td>
-                        <td>${incident.tool || "-"}</td>
-                        <td>${incident.reason || "-"}</td>
-                        <td>${actions}</td>
-                    </tr>
-                `;
-            }).join("");
-        }
-
-        async function fetchJson(url) {
-            const response = await fetch(url, {
-                headers: getAuthHeaders()
-            });
-
-            if (response.status === 401) {
-                logout();
-                throw new Error("Unauthorized");
-            }
-
-            if (!response.ok) {
-                throw new Error(`Request failed: ${url}`);
-            }
-
-            return response.json();
-        }
-
-        async function fetchPost(url) {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: getAuthHeaders()
-            });
-
-            if (response.status === 401) {
-                logout();
-                throw new Error("Unauthorized");
-            }
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || "Request failed");
-            }
-
-            return data;
-        }
-
-        async function loadIncidentStats() {
-            const stats = await fetchJson("/api/incidents/stats");
-            renderStats(stats);
-        }
-
-        async function loadIncidents() {
-            const status = document.getElementById("status-filter").value;
-            let url = "/api/incidents?limit=20";
-
-            if (status) {
-                url += `&status_filter=${encodeURIComponent(status)}`;
-            }
-
-            const incidents = await fetchJson(url);
-            renderIncidents(incidents);
-        }
-
-        async function loadIncidentsPage() {
-            try {
-                const user = await ensureLoggedIn();
-                if (!user) return;
-
-                await Promise.all([
-                    loadIncidentStats(),
-                    loadIncidents()
-                ]);
-            } catch (error) {
-                document.getElementById("incidents-body").innerHTML = `
-                    <tr>
-                        <td colspan="8" class="empty">Failed to load incidents.</td>
-                    </tr>
-                `;
-            }
-        }
-
-        async function acknowledgeIncident(incidentId) {
-            try {
-                await fetchPost(`/api/incidents/${incidentId}/ack`);
-                alert(`Incident #${incidentId} acknowledged.`);
-                loadIncidentsPage();
-            } catch (error) {
-                alert(error.message || "Unable to acknowledge incident.");
-            }
-        }
-
-        async function resolveIncident(incidentId) {
-            try {
-                await fetchPost(`/api/incidents/${incidentId}/resolve`);
-                alert(`Incident #${incidentId} resolved.`);
-                loadIncidentsPage();
-            } catch (error) {
-                alert(error.message || "Unable to resolve incident.");
-            }
-        }
-
-        loadIncidentsPage();
+        ensureLoggedIn();
     </script>
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,11 +9,13 @@
         :root {
             --bg: #0f1419;
             --panel: rgba(24, 32, 39, 0.92);
-            --panel-2: rgba(255,255,255,0.03);
+            --panel-2: rgba(255, 255, 255, 0.03);
             --line: rgba(173, 191, 204, 0.12);
             --text: #e6edf2;
             --muted: #93a3af;
-            --shadow: 0 20px 50px rgba(0,0,0,0.22);
+            --success: #8dd4a1;
+            --danger: #ef9b9b;
+            --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
         }
 
         * {
@@ -24,7 +27,7 @@
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
+                radial-gradient(circle at top left, rgba(110, 162, 157, 0.06), transparent 20%),
                 linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
         }
 
@@ -127,10 +130,11 @@
             padding: 10px 14px;
             border-radius: 12px;
             cursor: pointer;
+            transition: 0.18s ease;
         }
 
         .toolbar button:hover {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         textarea {
@@ -138,13 +142,19 @@
             min-height: 520px;
             resize: vertical;
             border: 1px solid var(--line);
-            background: rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03);
             color: var(--text);
             padding: 16px;
             border-radius: 14px;
             font-family: Consolas, "Courier New", monospace;
             font-size: 13px;
             line-height: 1.6;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: rgba(135, 170, 178, 0.35);
+            box-shadow: 0 0 0 3px rgba(135, 170, 178, 0.08);
         }
 
         .status {
@@ -152,6 +162,14 @@
             margin-top: 12px;
             color: var(--muted);
             font-size: 14px;
+        }
+
+        .status.success {
+            color: var(--success);
+        }
+
+        .status.error {
+            color: var(--danger);
         }
 
         .hint {
@@ -172,6 +190,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -183,7 +202,7 @@
                 <a href="/testing">Testing</a>
                 <a href="/incidents">Incidents</a>
                 <a href="/reports">Reports</a>
-                <a href="/policy-editor" class="active">Policy Editor</a>
+                <a href="/policy-editor" id="policy-link" class="active" hidden>Policy Editor</a>
                 <a href="#" onclick="logout()">Logout</a>
             </nav>
         </aside>
@@ -207,9 +226,9 @@
                 </div>
 
                 <div class="toolbar">
-                    <button onclick="loadPolicy()">Load Policy</button>
-                    <button onclick="savePolicy()">Save Policy</button>
-                    <button onclick="reloadPolicyOnly()">Reload Policy</button>
+                    <button type="button" onclick="loadPolicy()">Load Policy</button>
+                    <button type="button" onclick="savePolicy()">Save Policy</button>
+                    <button type="button" onclick="reloadPolicyOnly()">Reload Policy</button>
                 </div>
 
                 <textarea id="policy-content" placeholder="Policy YAML will appear here..."></textarea>
@@ -229,7 +248,9 @@
         function getAuthHeaders(json = false) {
             const token = getToken();
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            if (json) headers["Content-Type"] = "application/json";
+            if (json) {
+                headers["Content-Type"] = "application/json";
+            }
             return headers;
         }
 
@@ -239,8 +260,13 @@
             window.location.href = "/login";
         }
 
-        function setStatus(message) {
-            document.getElementById("status-msg").textContent = message;
+        function setStatus(message, type = "") {
+            const statusEl = document.getElementById("status-msg");
+            statusEl.textContent = message;
+            statusEl.className = "status";
+            if (type) {
+                statusEl.classList.add(type);
+            }
         }
 
         async function ensureLoggedIn() {
@@ -261,12 +287,18 @@
                 }
 
                 const user = await response.json();
-                document.getElementById("current-username").textContent = user.username;
-                document.getElementById("current-role").textContent = user.role;
+
+                const usernameEl = document.getElementById("current-username");
+                const roleEl = document.getElementById("current-role");
+
+                if (usernameEl) usernameEl.textContent = user.username;
+                if (roleEl) roleEl.textContent = user.role;
+
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
 
-                if (user.role !== "admin") {
-                    setStatus("Policy editing is restricted to admin users.");
+                const policyLink = document.getElementById("policy-link");
+                if (policyLink) {
+                    policyLink.hidden = user.role !== "admin";
                 }
 
                 return user;
@@ -292,19 +324,29 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    setStatus(data.detail || "Failed to load policy.");
+                    setStatus(data.detail || "Failed to load policy.", "error");
                     return;
                 }
 
                 document.getElementById("policy-content").value = data.content || "";
-                setStatus("Policy loaded successfully.");
+                setStatus("Policy loaded successfully.", "success");
             } catch (error) {
-                setStatus("Unable to connect to the server.");
+                setStatus("Unable to connect to the server.", "error");
             }
         }
 
         async function savePolicy() {
             const content = document.getElementById("policy-content").value;
+
+            const confirmed = confirm(
+                "Are you sure you want to update the security policy?\n\n" +
+                "This will change runtime security rules for the platform."
+            );
+
+            if (!confirmed) {
+                setStatus("Policy update cancelled.");
+                return;
+            }
 
             setStatus("Saving policy...");
 
@@ -323,13 +365,13 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    setStatus(data.detail || "Failed to save policy.");
+                    setStatus(data.detail || "Failed to save policy.", "error");
                     return;
                 }
 
-                setStatus("Policy updated successfully.");
+                setStatus("Policy updated successfully.", "success");
             } catch (error) {
-                setStatus("Unable to connect to the server.");
+                setStatus("Unable to connect to the server.", "error");
             }
         }
 
@@ -350,25 +392,30 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    setStatus(data.detail || "Failed to reload policy.");
+                    setStatus(data.detail || "Failed to reload policy.", "error");
                     return;
                 }
 
-                setStatus("Policy reloaded successfully.");
+                setStatus("Policy reloaded successfully.", "success");
             } catch (error) {
-                setStatus("Unable to connect to the server.");
+                setStatus("Unable to connect to the server.", "error");
             }
         }
 
         async function initPage() {
             const user = await ensureLoggedIn();
             if (!user) return;
-            if (user.role === "admin") {
-                loadPolicy();
+
+            if (user.role !== "admin") {
+                setStatus("Access restricted to admin users.", "error");
+                return;
             }
+
+            await loadPolicy();
         }
 
         initPage();
     </script>
 </body>
+
 </html>

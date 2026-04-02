@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,7 +10,7 @@
             --bg: #0f1419;
             --bg-2: #151c22;
             --panel: rgba(24, 32, 39, 0.92);
-            --panel-2: rgba(255,255,255,0.03);
+            --panel-2: rgba(255, 255, 255, 0.03);
             --line: rgba(173, 191, 204, 0.12);
             --text: #e6edf2;
             --muted: #93a3af;
@@ -18,7 +19,7 @@
             --success: #4fa36c;
             --warning: #d7a54b;
             --danger: #d46a6a;
-            --shadow: 0 20px 50px rgba(0,0,0,0.22);
+            --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
         }
 
         * {
@@ -30,7 +31,7 @@
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
+                radial-gradient(circle at top left, rgba(110, 162, 157, 0.06), transparent 20%),
                 linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
         }
 
@@ -130,7 +131,7 @@
         }
 
         .toolbar button:hover {
-            background: rgba(255,255,255,0.04);
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .grid-cards {
@@ -189,7 +190,7 @@
             padding: 12px 14px;
             border-radius: 14px;
             border: 1px solid var(--line);
-            background: rgba(255,255,255,0.025);
+            background: rgba(255, 255, 255, 0.025);
         }
 
         .metric-key {
@@ -217,14 +218,14 @@
             padding: 14px;
             border: 1px solid var(--line);
             border-radius: 14px;
-            background: rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03);
             transition: 0.18s ease;
             cursor: pointer;
             font-size: 14px;
         }
 
         .export-btn:hover {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .muted {
@@ -281,6 +282,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -291,7 +293,11 @@
                 <a href="/dashboard">Dashboard</a>
                 <a href="/testing">Testing</a>
                 <a href="/incidents">Incidents</a>
-                <a href="/reports" class="active">Reports</a>
+                <a href="/reports">Reports</a>
+
+                <!-- Admin only -->
+                <a href="/policy-editor" id="policy-link" hidden>Policy Editor</a>
+
                 <a href="#" onclick="logout()">Logout</a>
             </nav>
         </aside>
@@ -390,16 +396,19 @@
             <section class="card">
                 <h2 class="section-title">Export Center</h2>
                 <div class="export-grid">
-                    <button class="export-btn" onclick="downloadExport('/export/events/json', 'secureagent_events.json')">
+                    <button class="export-btn"
+                        onclick="downloadExport('/export/events/json', 'secureagent_events.json')">
                         Export Events JSON
                     </button>
-                    <button class="export-btn" onclick="downloadExport('/export/incidents/json', 'secureagent_incidents.json')">
+                    <button class="export-btn"
+                        onclick="downloadExport('/export/incidents/json', 'secureagent_incidents.json')">
                         Export Incidents JSON
                     </button>
                     <button class="export-btn" onclick="downloadExport('/export/events/csv', 'secureagent_events.csv')">
                         Export Events CSV
                     </button>
-                    <button class="export-btn" onclick="downloadExport('/export/incidents/csv', 'secureagent_incidents.csv')">
+                    <button class="export-btn"
+                        onclick="downloadExport('/export/incidents/csv', 'secureagent_incidents.csv')">
                         Export Incidents CSV
                     </button>
                 </div>
@@ -416,9 +425,11 @@
             return localStorage.getItem(TOKEN_KEY);
         }
 
-        function getAuthHeaders() {
+        function getAuthHeaders(json = false) {
             const token = getToken();
-            return token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            if (json) headers["Content-Type"] = "application/json";
+            return headers;
         }
 
         function logout() {
@@ -445,189 +456,31 @@
                 }
 
                 const user = await response.json();
-                document.getElementById("current-username").textContent = user.username;
-                document.getElementById("current-role").textContent = user.role;
+
+                const usernameEl = document.getElementById("current-username");
+                const roleEl = document.getElementById("current-role");
+
+                if (usernameEl) usernameEl.textContent = user.username;
+                if (roleEl) roleEl.textContent = user.role;
+
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+                // 🔐 Admin-only Policy Editor
+                const policyLink = document.getElementById("policy-link");
+                if (policyLink) {
+                    policyLink.hidden = user.role !== "admin";
+                }
+
                 return user;
+
             } catch (error) {
                 logout();
                 return false;
             }
         }
 
-        function buildQueryParams() {
-            const params = new URLSearchParams();
-            const appId = document.getElementById("app-filter").value.trim();
-            const role = document.getElementById("role-filter").value;
-
-            if (appId) params.append("app_id", appId);
-            if (role) params.append("role", role);
-
-            return params.toString();
-        }
-
-        function setStatus(message) {
-            document.getElementById("report-status").textContent = message;
-        }
-
-        function renderTopSummary(summary) {
-            document.getElementById("total-events").textContent = summary.total_events ?? 0;
-            document.getElementById("blocked-events").textContent = summary.blocked_events ?? 0;
-            document.getElementById("redacted-outputs").textContent = summary.redacted_outputs ?? 0;
-            document.getElementById("high-risk-events").textContent = summary.high_risk_events ?? 0;
-            document.getElementById("total-incidents").textContent = summary.total_incidents ?? 0;
-        }
-
-        function renderMetricList(elementId, obj, emptyText = "No data available.") {
-            const container = document.getElementById(elementId);
-
-            if (!obj || Object.keys(obj).length === 0) {
-                container.innerHTML = `<div class="empty">${emptyText}</div>`;
-                return;
-            }
-
-            container.innerHTML = Object.entries(obj).map(([key, value]) => `
-                <div class="metric-row">
-                    <span class="metric-key">${key}</span>
-                    <span class="metric-value">${value}</span>
-                </div>
-            `).join("");
-        }
-
-        function renderSummaryBreakdown(report) {
-            const scope = report.scope || {};
-            const summary = report.summary || {};
-            const incidentStatus = report.breakdown?.incident_by_status || {};
-
-            const combined = {
-                app_scope: scope.app_id || "all-apps",
-                role_scope: scope.role || "all-roles",
-                total_events: summary.total_events ?? 0,
-                blocked_events: summary.blocked_events ?? 0,
-                redacted_outputs: summary.redacted_outputs ?? 0,
-                high_risk_events: summary.high_risk_events ?? 0,
-                total_incidents: summary.total_incidents ?? 0,
-                open_incidents: incidentStatus.open ?? 0,
-                acknowledged_incidents: incidentStatus.acknowledged ?? 0,
-                resolved_incidents: incidentStatus.resolved ?? 0
-            };
-
-            renderMetricList("summary-breakdown", combined);
-        }
-
-        async function fetchJson(url) {
-            const response = await fetch(url, {
-                headers: getAuthHeaders()
-            });
-
-            if (response.status === 401) {
-                logout();
-                throw new Error("Unauthorized");
-            }
-
-            if (response.status === 403) {
-                throw new Error("Access denied for reports.");
-            }
-
-            if (!response.ok) {
-                throw new Error(`Request failed: ${url}`);
-            }
-
-            return response.json();
-        }
-
-        async function loadReportData() {
-            const query = buildQueryParams();
-            const url = query
-                ? `/reports/security-summary?${query}`
-                : `/reports/security-summary`;
-
-            const report = await fetchJson(url);
-
-            renderTopSummary(report.summary || {});
-            renderSummaryBreakdown(report);
-            renderMetricList("severity-breakdown", report.breakdown?.by_severity, "No severity data.");
-            renderMetricList("app-breakdown", report.breakdown?.by_app, "No app data.");
-            renderMetricList("role-breakdown", report.breakdown?.by_role, "No role data.");
-            setStatus("Report loaded successfully.");
-        }
-
-        async function loadReportsPage() {
-            try {
-                const user = await ensureLoggedIn();
-                if (!user) return;
-
-                await loadReportData();
-            } catch (error) {
-                document.getElementById("summary-breakdown").innerHTML = `<div class="empty">Failed to load report.</div>`;
-                document.getElementById("severity-breakdown").innerHTML = `<div class="empty">Failed to load severity data.</div>`;
-                document.getElementById("app-breakdown").innerHTML = `<div class="empty">Failed to load app data.</div>`;
-                document.getElementById("role-breakdown").innerHTML = `<div class="empty">Failed to load role data.</div>`;
-                setStatus(error.message || "Unable to load reports.");
-            }
-        }
-
-        async function downloadExport(baseUrl, fallbackFilename) {
-            try {
-                const query = buildQueryParams();
-                const url = query ? `${baseUrl}?${query}` : baseUrl;
-
-                const response = await fetch(url, {
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
-                if (response.status === 403) {
-                    setStatus("Access denied for export.");
-                    return;
-                }
-
-                if (!response.ok) {
-                    setStatus("Export failed.");
-                    return;
-                }
-
-                const blob = await response.blob();
-
-                let filename = fallbackFilename;
-                const disposition = response.headers.get("Content-Disposition");
-                if (disposition) {
-                    const match = disposition.match(/filename="?([^"]+)"?/);
-                    if (match && match[1]) {
-                        filename = match[1];
-                    }
-                }
-
-                const blobUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = blobUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(blobUrl);
-
-                setStatus(`Downloaded ${filename}`);
-            } catch (error) {
-                setStatus("Unable to download export.");
-            }
-        }
-
-        function applyFilters() {
-            loadReportsPage();
-        }
-
-        function clearFilters() {
-            document.getElementById("app-filter").value = "";
-            document.getElementById("role-filter").value = "";
-            loadReportsPage();
-        }
-
-        loadReportsPage();
+        ensureLoggedIn();
     </script>
 </body>
-</html>Āæśēāæ
+
+</html>
