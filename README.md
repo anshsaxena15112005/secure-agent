@@ -426,12 +426,6 @@ This project is especially relevant for:
 
 ---
 
-## Resume / CV Ready Summary
-
-SecureAgent is an AI runtime security platform built with FastAPI that provides real-time monitoring, security event analysis, incident management, protected reporting, role-based access control, and a testing lab for evaluating unsafe agent behavior.
-
----
-
 ## Author
 
 **Ansh Saxena**

@@ -229,6 +229,7 @@
                     <button type="button" onclick="loadPolicy()">Load Policy</button>
                     <button type="button" onclick="savePolicy()">Save Policy</button>
                     <button type="button" onclick="reloadPolicyOnly()">Reload Policy</button>
+                    <button type="button" onclick="resetPolicy()">Reset Policy</button>
                 </div>
 
                 <textarea id="policy-content" placeholder="Policy YAML will appear here..."></textarea>
@@ -397,6 +398,44 @@
                 }
 
                 setStatus("Policy reloaded successfully.", "success");
+            } catch (error) {
+                setStatus("Unable to connect to the server.", "error");
+            }
+        }
+
+        async function resetPolicy() {
+            const confirmed = confirm(
+                "Are you sure you want to reset the security policy?\n\n" +
+                "This will restore the default backup policy and overwrite current changes."
+            );
+
+            if (!confirmed) {
+                setStatus("Policy reset cancelled.");
+                return;
+            }
+
+            setStatus("Resetting policy...");
+
+            try {
+                const response = await fetch("/security/policy/reset", {
+                    method: "POST",
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus(data.detail || "Failed to reset policy.", "error");
+                    return;
+                }
+
+                await loadPolicy();
+                setStatus("Policy reset successfully.", "success");
             } catch (error) {
                 setStatus("Unable to connect to the server.", "error");
             }

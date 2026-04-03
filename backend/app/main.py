@@ -13,7 +13,13 @@ from backend.app.db import init_db, SessionLocal, SecurityEvent, Incident
 from backend.app.agent.planner import plan_task
 from backend.app.agent.executor import execute_plan
 from backend.app.security import get_policy_status
-from backend.app.policy_loader import get_policy, read_policy_text, write_policy_text, reload_policy
+from backend.app.policy_loader import (
+    get_policy,
+    read_policy_text,
+    write_policy_text,
+    reload_policy,
+    reset_policy_text,
+)
 from backend.security.auth import (
     authenticate_user,
     create_access_token,
@@ -378,6 +384,18 @@ def update_security_policy(
         "message": "Policy updated successfully",
         "policy": updated
     }
+
+
+@app.post("/security/policy/reset")
+def reset_security_policy(current_user=Depends(require_platform_roles("admin"))):
+    try:
+        policy = reset_policy_text()
+        return {
+            "message": "Policy reset successfully",
+            "policy": policy
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @app.get("/security/stats")
