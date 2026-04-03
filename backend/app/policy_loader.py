@@ -11,7 +11,7 @@ _POLICY_CACHE = None
 def load_policy():
     global _POLICY_CACHE
     with open(POLICY_PATH, "r", encoding="utf-8") as f:
-        _POLICY_CACHE = yaml.safe_load(f)
+        _POLICY_CACHE = yaml.safe_load(f) or {}
     return _POLICY_CACHE
 
 
