@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,7 +9,7 @@
             --bg: #0f1419;
             --bg-2: #151c22;
             --panel: rgba(24, 32, 39, 0.92);
-            --panel-2: rgba(255, 255, 255, 0.03);
+            --panel-2: rgba(255,255,255,0.03);
             --line: rgba(173, 191, 204, 0.12);
             --text: #e6edf2;
             --muted: #93a3af;
@@ -19,19 +18,17 @@
             --success: #4fa36c;
             --warning: #d7a54b;
             --danger: #d46a6a;
-            --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+            --shadow: 0 20px 50px rgba(0,0,0,0.22);
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
             font-family: Inter, "Segoe UI", Arial, sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(110, 162, 157, 0.06), transparent 20%),
+                radial-gradient(circle at top left, rgba(110,162,157,0.06), transparent 20%),
                 linear-gradient(180deg, #0d1216 0%, #12191f 48%, #151c22 100%);
         }
 
@@ -146,8 +143,9 @@
 
         .section-grid {
             display: grid;
-            grid-template-columns: 1.3fr 0.9fr;
+            grid-template-columns: 1.2fr 0.8fr;
             gap: 18px;
+            margin-bottom: 18px;
         }
 
         .section-title {
@@ -164,8 +162,7 @@
             border-collapse: collapse;
         }
 
-        th,
-        td {
+        th, td {
             text-align: left;
             padding: 12px 10px;
             border-bottom: 1px solid var(--line);
@@ -184,27 +181,13 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 700;
+            text-transform: capitalize;
         }
 
-        .low {
-            background: rgba(79, 163, 108, 0.15);
-            color: #8dd4a1;
-        }
-
-        .medium {
-            background: rgba(215, 165, 75, 0.16);
-            color: #e8c374;
-        }
-
-        .high {
-            background: rgba(212, 106, 106, 0.16);
-            color: #ef9b9b;
-        }
-
-        .critical {
-            background: rgba(255, 80, 80, 0.18);
-            color: #ff9a9a;
-        }
+        .low { background: rgba(79,163,108,0.15); color: #8dd4a1; }
+        .medium { background: rgba(215,165,75,0.16); color: #e8c374; }
+        .high { background: rgba(212,106,106,0.16); color: #ef9b9b; }
+        .critical { background: rgba(255,80,80,0.18); color: #ff9a9a; }
 
         .list {
             display: grid;
@@ -215,7 +198,7 @@
             padding: 14px;
             border: 1px solid var(--line);
             border-radius: 16px;
-            background: rgba(255, 255, 255, 0.025);
+            background: rgba(255,255,255,0.025);
         }
 
         .alert-head {
@@ -253,7 +236,12 @@
         }
 
         .toolbar button:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .toolbar button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         @media (max-width: 1100px) {
@@ -282,7 +270,6 @@
         }
     </style>
 </head>
-
 <body>
     <div class="layout">
         <aside class="sidebar">
@@ -290,15 +277,12 @@
             <div class="brand-sub">AI Runtime Security Platform</div>
 
             <nav class="nav">
-                <a href="/dashboard">Dashboard</a>
+                <a href="/dashboard" class="active">Dashboard</a>
                 <a href="/testing">Testing</a>
                 <a href="/incidents">Incidents</a>
                 <a href="/reports">Reports</a>
-
-                <!-- Admin only -->
                 <a href="/policy-editor" id="policy-link" hidden>Policy Editor</a>
-
-                <a href="#" onclick="logout()">Logout</a>
+                <a href="#" id="logout-link">Logout</a>
             </nav>
         </aside>
 
@@ -316,8 +300,8 @@
             </div>
 
             <div class="toolbar">
-                <button onclick="loadDashboard()">Refresh Dashboard</button>
-                <button onclick="runQuickRedTeam()">Run Quick Red-Team Test</button>
+                <button id="refresh-dashboard-btn" type="button">Refresh Dashboard</button>
+                <button id="redteam-btn" type="button">Run Quick Red-Team Test</button>
             </div>
 
             <section class="grid-cards">
@@ -376,12 +360,31 @@
                     </div>
                 </div>
             </section>
+
+            <section class="section-grid">
+                <div class="card">
+                    <h2 class="section-title">Live Alert Feed</h2>
+                    <div id="live-alert-feed" class="list">
+                        <div class="empty">Waiting for live alerts...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="section-title">Policy Status</h2>
+                    <div class="list" id="policy-status-box">
+                        <div class="empty">Policy visibility is available via the policy editor.</div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
     <script>
         const TOKEN_KEY = "secureagent_token";
         const USER_KEY = "secureagent_user";
+        let alertSocket = null;
+        let alertHeartbeat = null;
+        let reconnectTimer = null;
 
         function getToken() {
             return localStorage.getItem(TOKEN_KEY);
@@ -389,15 +392,51 @@
 
         function getAuthHeaders(json = false) {
             const token = getToken();
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = {};
+            if (token) headers.Authorization = `Bearer ${token}`;
             if (json) headers["Content-Type"] = "application/json";
             return headers;
         }
 
         function logout() {
+            if (alertHeartbeat) {
+                clearInterval(alertHeartbeat);
+                alertHeartbeat = null;
+            }
+
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+
+            if (alertSocket) {
+                try {
+                    alertSocket.close();
+                } catch (e) {}
+                alertSocket = null;
+            }
+
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(USER_KEY);
             window.location.href = "/login";
+        }
+
+        async function fetchJson(url) {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            if (!response.ok) {
+                throw new Error(`${url} failed with ${response.status}`);
+            }
+
+            return response.json();
         }
 
         async function ensureLoggedIn() {
@@ -408,41 +447,271 @@
             }
 
             try {
-                const response = await fetch("/auth/me", {
-                    headers: getAuthHeaders()
-                });
+                const user = await fetchJson("/auth/me");
 
-                if (!response.ok) {
-                    logout();
-                    return false;
-                }
-
-                const user = await response.json();
-
-                const usernameEl = document.getElementById("current-username");
-                const roleEl = document.getElementById("current-role");
-
-                if (usernameEl) usernameEl.textContent = user.username;
-                if (roleEl) roleEl.textContent = user.role;
-
+                document.getElementById("current-username").textContent = user.username || "User";
+                document.getElementById("current-role").textContent = user.role || "member";
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
 
-                // 🔐 Admin-only Policy Editor
                 const policyLink = document.getElementById("policy-link");
                 if (policyLink) {
                     policyLink.hidden = user.role !== "admin";
                 }
 
-                return user;
-
+                return true;
             } catch (error) {
+                console.error("Auth failed:", error);
                 logout();
                 return false;
             }
         }
 
-        ensureLoggedIn();
+        function formatTime(value) {
+            if (!value) return "-";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
+        }
+
+        function severityClass(severity) {
+            const s = (severity || "low").toLowerCase();
+            return ["low", "medium", "high", "critical"].includes(s) ? s : "low";
+        }
+
+        function renderStats(stats) {
+            document.getElementById("total-events").textContent = stats.total_events ?? 0;
+            document.getElementById("blocked-events").textContent = stats.blocked_events ?? 0;
+            document.getElementById("allowed-events").textContent = stats.allowed_events ?? 0;
+            document.getElementById("high-risk-events").textContent = stats.high_risk_events ?? 0;
+        }
+
+        function renderEvents(events) {
+            const body = document.getElementById("events-body");
+
+            if (!Array.isArray(events) || events.length === 0) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="empty">No events found.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            body.innerHTML = events.map(event => `
+                <tr>
+                    <td>${formatTime(event.timestamp || event.time || event.created_at)}</td>
+                    <td>${event.event_type || event.type || "-"}</td>
+                    <td><span class="pill ${severityClass(event.severity)}">${event.severity || "low"}</span></td>
+                    <td>${event.tool || "-"}</td>
+                    <td>${event.reason || event.message || "-"}</td>
+                </tr>
+            `).join("");
+        }
+
+        function renderAlerts(alerts) {
+            const list = document.getElementById("alerts-list");
+
+            if (!Array.isArray(alerts) || alerts.length === 0) {
+                list.innerHTML = `<div class="empty">No active alerts.</div>`;
+                return;
+            }
+
+            list.innerHTML = alerts.map(alert => `
+                <div class="alert-item">
+                    <div class="alert-head">
+                        <strong>${alert.event_type || alert.type || "Unknown Alert"}</strong>
+                        <span class="pill ${severityClass(alert.severity)}">${alert.severity || "low"}</span>
+                    </div>
+                    <div class="muted"><strong>Tool:</strong> ${alert.tool || "-"}</div>
+                    <div class="muted"><strong>Risk:</strong> ${alert.risk ?? "-"}</div>
+                    <div style="margin-top:8px;">${alert.reason || alert.message || "No reason available."}</div>
+                </div>
+            `).join("");
+        }
+
+        function prependLiveAlert(html) {
+            const feed = document.getElementById("live-alert-feed");
+            if (!feed) return;
+
+            const empty = feed.querySelector(".empty");
+            if (empty) feed.innerHTML = "";
+
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = html;
+            const first = wrapper.firstElementChild;
+            if (first) {
+                feed.prepend(first);
+            }
+
+            while (feed.children.length > 10) {
+                feed.removeChild(feed.lastElementChild);
+            }
+        }
+
+        function renderLiveEventCard(event) {
+            return `
+                <div class="alert-item">
+                    <div class="alert-head">
+                        <strong>${event.event_type || event.type || "Security Event"}</strong>
+                        <span class="pill ${severityClass(event.severity)}">${event.severity || "low"}</span>
+                    </div>
+                    <div class="muted"><strong>Time:</strong> ${formatTime(event.timestamp || event.time || event.created_at)}</div>
+                    <div class="muted"><strong>Tool:</strong> ${event.tool || "-"}</div>
+                    <div class="muted"><strong>Risk:</strong> ${event.risk ?? "-"}</div>
+                    <div style="margin-top:8px;">${event.reason || event.message || "No reason available."}</div>
+                </div>
+            `;
+        }
+
+        async function loadDashboard() {
+            const refreshBtn = document.getElementById("refresh-dashboard-btn");
+
+            try {
+                refreshBtn.disabled = true;
+
+                const [stats, events, alerts] = await Promise.all([
+                    fetchJson("/security/stats"),
+                    fetchJson("/events?limit=8"),
+                    fetchJson("/alerts?limit=5")
+                ]);
+
+                renderStats(stats);
+                renderEvents(events);
+                renderAlerts(alerts);
+            } catch (error) {
+                console.error("Dashboard load failed:", error);
+
+                document.getElementById("events-body").innerHTML = `
+                    <tr>
+                        <td colspan="5" class="empty">Failed to load dashboard data.</td>
+                    </tr>
+                `;
+
+                document.getElementById("alerts-list").innerHTML = `
+                    <div class="empty">Failed to load alerts.</div>
+                `;
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        async function runQuickRedTeam() {
+            const redBtn = document.getElementById("redteam-btn");
+
+            try {
+                redBtn.disabled = true;
+
+                const response = await fetch("/security/red-team-test", {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({})
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    alert(`Failed to run red-team test. ${text || ""}`);
+                    return;
+                }
+
+                const data = await response.json();
+
+                alert(
+                    `Red-team test complete\n\n` +
+                    `Total: ${data.summary?.total_tests ?? 0}\n` +
+                    `Blocked: ${data.summary?.blocked ?? 0}\n` +
+                    `Allowed: ${data.summary?.allowed ?? 0}\n` +
+                    `Errors: ${data.summary?.errors ?? 0}`
+                );
+
+                await loadDashboard();
+            } catch (error) {
+                console.error("Red-team request failed:", error);
+                alert("Unable to connect to the server.");
+            } finally {
+                redBtn.disabled = false;
+            }
+        }
+
+        function connectAlertSocket() {
+            const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+            const socketUrl = `${protocol}://${window.location.host}/ws/alerts`;
+
+            try {
+                alertSocket = new WebSocket(socketUrl);
+            } catch (error) {
+                console.error("WebSocket init failed:", error);
+                return;
+            }
+
+            alertSocket.onopen = () => {
+                if (alertHeartbeat) clearInterval(alertHeartbeat);
+
+                alertHeartbeat = setInterval(() => {
+                    if (alertSocket && alertSocket.readyState === WebSocket.OPEN) {
+                        alertSocket.send("ping");
+                    }
+                }, 15000);
+            };
+
+            alertSocket.onmessage = async (message) => {
+                try {
+                    const payload = JSON.parse(message.data);
+
+                    if (payload.type === "security_event" && payload.event) {
+                        prependLiveAlert(renderLiveEventCard(payload.event));
+                        await loadDashboard();
+                    }
+
+                    if (payload.type === "incident_created" && payload.incident) {
+                        prependLiveAlert(renderLiveEventCard(payload.incident));
+                        await loadDashboard();
+                    }
+                } catch (error) {
+                    console.error("WebSocket message parse failed", error);
+                }
+            };
+
+            alertSocket.onclose = () => {
+                if (alertHeartbeat) {
+                    clearInterval(alertHeartbeat);
+                    alertHeartbeat = null;
+                }
+
+                reconnectTimer = setTimeout(() => {
+                    connectAlertSocket();
+                }, 3000);
+            };
+
+            alertSocket.onerror = (error) => {
+                console.error("Live alert socket error", error);
+            };
+        }
+
+        function bindEvents() {
+            document.getElementById("refresh-dashboard-btn").addEventListener("click", loadDashboard);
+            document.getElementById("redteam-btn").addEventListener("click", runQuickRedTeam);
+            document.getElementById("logout-link").addEventListener("click", function (e) {
+                e.preventDefault();
+                logout();
+            });
+        }
+
+        async function initDashboardPage() {
+            bindEvents();
+
+            const ok = await ensureLoggedIn();
+            if (!ok) return;
+
+            await loadDashboard();
+            connectAlertSocket();
+        }
+
+        document.addEventListener("DOMContentLoaded", initDashboardPage);
     </script>
 </body>
-
 </html>

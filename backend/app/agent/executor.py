@@ -1,6 +1,9 @@
+import asyncio
+
 from backend.app.security import analyze_prompt, evaluate_tool_use, inspect_output
 from backend.app.policy_loader import get_policy
 from backend.app.db import SessionLocal, SecurityEvent, Incident
+from backend.app.ws_manager import manager
 
 
 def log_event(
@@ -30,6 +33,29 @@ def log_event(
         )
         db.add(event)
         db.commit()
+        db.refresh(event)
+
+        payload = {
+            "type": "security_event",
+            "event": {
+                "id": event.id,
+                "timestamp": event.timestamp.isoformat() if event.timestamp else None,
+                "app_id": event.app_id,
+                "role": event.role,
+                "event_type": event.event_type,
+                "severity": event.severity,
+                "tool": event.tool,
+                "reason": event.reason,
+                "risk": event.risk,
+                "goal": event.goal,
+            }
+        }
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast(payload))
+        except RuntimeError:
+            pass
 
         if risk >= incident_threshold:
             incident = Incident(
@@ -45,6 +71,7 @@ def log_event(
             )
             db.add(incident)
             db.commit()
+            db.refresh(incident)
 
     finally:
         db.close()

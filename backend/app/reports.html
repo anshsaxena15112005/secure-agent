@@ -127,11 +127,19 @@
             color: var(--text);
             padding: 10px 14px;
             border-radius: 12px;
+        }
+
+        .toolbar button {
             cursor: pointer;
         }
 
         .toolbar button:hover {
             background: rgba(255, 255, 255, 0.04);
+        }
+
+        .toolbar button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .grid-cards {
@@ -245,6 +253,14 @@
             font-size: 14px;
         }
 
+        .success-text {
+            color: #8dd4a1;
+        }
+
+        .error-text {
+            color: #ef9b9b;
+        }
+
         @media (max-width: 1200px) {
             .grid-cards {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -293,12 +309,9 @@
                 <a href="/dashboard">Dashboard</a>
                 <a href="/testing">Testing</a>
                 <a href="/incidents">Incidents</a>
-                <a href="/reports">Reports</a>
-
-                <!-- Admin only -->
+                <a href="/reports" class="active">Reports</a>
                 <a href="/policy-editor" id="policy-link" hidden>Policy Editor</a>
-
-                <a href="#" onclick="logout()">Logout</a>
+                <a href="#" id="logout-link">Logout</a>
             </nav>
         </aside>
 
@@ -316,7 +329,7 @@
             </div>
 
             <div class="toolbar">
-                <button onclick="loadReportsPage()">Refresh Report</button>
+                <button id="refresh-report-btn" type="button">Refresh Report</button>
                 <input id="app-filter" type="text" placeholder="Filter by app_id" />
                 <select id="role-filter">
                     <option value="">All roles</option>
@@ -325,8 +338,8 @@
                     <option value="auditor">auditor</option>
                     <option value="user">user</option>
                 </select>
-                <button onclick="applyFilters()">Apply Filters</button>
-                <button onclick="clearFilters()">Clear Filters</button>
+                <button id="apply-filters-btn" type="button">Apply Filters</button>
+                <button id="clear-filters-btn" type="button">Clear Filters</button>
             </div>
 
             <section class="grid-cards">
@@ -396,19 +409,16 @@
             <section class="card">
                 <h2 class="section-title">Export Center</h2>
                 <div class="export-grid">
-                    <button class="export-btn"
-                        onclick="downloadExport('/export/events/json', 'secureagent_events.json')">
+                    <button class="export-btn" type="button" data-url="/export/events/json" data-filename="secureagent_events.json">
                         Export Events JSON
                     </button>
-                    <button class="export-btn"
-                        onclick="downloadExport('/export/incidents/json', 'secureagent_incidents.json')">
+                    <button class="export-btn" type="button" data-url="/export/incidents/json" data-filename="secureagent_incidents.json">
                         Export Incidents JSON
                     </button>
-                    <button class="export-btn" onclick="downloadExport('/export/events/csv', 'secureagent_events.csv')">
+                    <button class="export-btn" type="button" data-url="/export/events/csv" data-filename="secureagent_events.csv">
                         Export Events CSV
                     </button>
-                    <button class="export-btn"
-                        onclick="downloadExport('/export/incidents/csv', 'secureagent_incidents.csv')">
+                    <button class="export-btn" type="button" data-url="/export/incidents/csv" data-filename="secureagent_incidents.csv">
                         Export Incidents CSV
                     </button>
                 </div>
@@ -421,13 +431,17 @@
         const TOKEN_KEY = "secureagent_token";
         const USER_KEY = "secureagent_user";
 
+        let allEvents = [];
+        let allIncidents = [];
+
         function getToken() {
             return localStorage.getItem(TOKEN_KEY);
         }
 
         function getAuthHeaders(json = false) {
             const token = getToken();
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = {};
+            if (token) headers.Authorization = `Bearer ${token}`;
             if (json) headers["Content-Type"] = "application/json";
             return headers;
         }
@@ -438,6 +452,30 @@
             window.location.href = "/login";
         }
 
+        function setStatus(message, isError = false) {
+            const box = document.getElementById("report-status");
+            box.textContent = message;
+            box.className = isError ? "status-box error-text" : "status-box success-text";
+        }
+
+        async function apiGet(url) {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            if (!response.ok) {
+                throw new Error(`${url} failed with ${response.status}`);
+            }
+
+            return response.json();
+        }
+
         async function ensureLoggedIn() {
             const token = getToken();
             if (!token) {
@@ -446,40 +484,259 @@
             }
 
             try {
-                const response = await fetch("/auth/me", {
-                    headers: getAuthHeaders()
-                });
-
-                if (!response.ok) {
-                    logout();
-                    return false;
-                }
-
-                const user = await response.json();
+                const user = await apiGet("/auth/me");
 
                 const usernameEl = document.getElementById("current-username");
                 const roleEl = document.getElementById("current-role");
+                const policyLink = document.getElementById("policy-link");
 
-                if (usernameEl) usernameEl.textContent = user.username;
-                if (roleEl) roleEl.textContent = user.role;
+                if (usernameEl) usernameEl.textContent = user.username || "User";
+                if (roleEl) roleEl.textContent = user.role || "member";
+                if (policyLink) policyLink.hidden = user.role !== "admin";
 
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
-
-                // 🔐 Admin-only Policy Editor
-                const policyLink = document.getElementById("policy-link");
-                if (policyLink) {
-                    policyLink.hidden = user.role !== "admin";
-                }
-
-                return user;
-
+                return true;
             } catch (error) {
+                console.error("Auth failed:", error);
                 logout();
                 return false;
             }
         }
 
-        ensureLoggedIn();
+        function normalizeArray(payload) {
+            if (Array.isArray(payload)) return payload;
+            if (Array.isArray(payload.items)) return payload.items;
+            if (Array.isArray(payload.data)) return payload.data;
+            if (Array.isArray(payload.events)) return payload.events;
+            if (Array.isArray(payload.incidents)) return payload.incidents;
+            return [];
+        }
+
+        async function fetchEvents() {
+            const endpoints = [
+                "/events",
+                "/api/events",
+                "/reports/events"
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    const data = await apiGet(endpoint);
+                    return normalizeArray(data);
+                } catch (error) {
+                    console.warn(`Failed events endpoint: ${endpoint}`, error);
+                }
+            }
+
+            return [];
+        }
+
+        async function fetchIncidents() {
+            const endpoints = [
+                "/api/incidents",
+                "/incidents/data",
+                "/incidents/list"
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    const data = await apiGet(endpoint);
+                    return normalizeArray(data);
+                } catch (error) {
+                    console.warn(`Failed incidents endpoint: ${endpoint}`, error);
+                }
+            }
+
+            return [];
+        }
+
+        function updateCard(id, value) {
+            document.getElementById(id).textContent = value;
+        }
+
+        function renderMetricList(elementId, entries, emptyMessage) {
+            const container = document.getElementById(elementId);
+
+            if (!entries.length) {
+                container.innerHTML = `<div class="empty">${emptyMessage}</div>`;
+                return;
+            }
+
+            container.innerHTML = entries.map(([key, value]) => `
+                <div class="metric-row">
+                    <div class="metric-key">${key}</div>
+                    <div class="metric-value">${value}</div>
+                </div>
+            `).join("");
+        }
+
+        function groupCount(items, selector) {
+            const counts = {};
+            items.forEach(item => {
+                const key = selector(item) || "Unknown";
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        }
+
+        function filteredData() {
+            const appFilter = document.getElementById("app-filter").value.trim().toLowerCase();
+            const roleFilter = document.getElementById("role-filter").value.trim().toLowerCase();
+
+            const events = allEvents.filter(event => {
+                const appId = String(event.app_id || event.app || "").toLowerCase();
+                const role = String(event.role || event.user_role || "").toLowerCase();
+
+                const appOk = !appFilter || appId.includes(appFilter);
+                const roleOk = !roleFilter || role === roleFilter;
+
+                return appOk && roleOk;
+            });
+
+            const incidents = allIncidents.filter(incident => {
+                const appId = String(incident.app_id || incident.app || "").toLowerCase();
+                const role = String(incident.role || incident.user_role || "").toLowerCase();
+
+                const appOk = !appFilter || appId.includes(appFilter);
+                const roleOk = !roleFilter || role === roleFilter;
+
+                return appOk && roleOk;
+            });
+
+            return { events, incidents };
+        }
+
+        function renderReports(events, incidents) {
+            const totalEvents = events.length;
+            const blockedEvents = events.filter(e => Boolean(e.blocked) || (e.action || "").toLowerCase() === "blocked" || (e.status || "").toLowerCase() === "blocked").length;
+            const redactedOutputs = events.filter(e => Boolean(e.redacted) || (e.action || "").toLowerCase() === "redacted" || (e.output_action || "").toLowerCase() === "redacted").length;
+            const highRiskEvents = events.filter(e => Number(e.risk ?? e.risk_score ?? 0) >= 60).length;
+            const totalIncidents = incidents.length;
+
+            updateCard("total-events", totalEvents);
+            updateCard("blocked-events", blockedEvents);
+            updateCard("redacted-outputs", redactedOutputs);
+            updateCard("high-risk-events", highRiskEvents);
+            updateCard("total-incidents", totalIncidents);
+
+            const summaryEntries = [
+                ["Total Events", totalEvents],
+                ["Blocked Events", blockedEvents],
+                ["Redacted Outputs", redactedOutputs],
+                ["High Risk Events", highRiskEvents],
+                ["Total Incidents", totalIncidents]
+            ];
+
+            const severityEntries = groupCount(events, e => e.severity || "Unknown");
+            const appEntries = groupCount(events, e => e.app_id || e.app || "Unknown");
+            const roleEntries = groupCount(events, e => e.role || e.user_role || "Unknown");
+
+            renderMetricList("summary-breakdown", summaryEntries, "No summary data available.");
+            renderMetricList("severity-breakdown", severityEntries, "No severity data available.");
+            renderMetricList("app-breakdown", appEntries, "No application data available.");
+            renderMetricList("role-breakdown", roleEntries, "No role data available.");
+        }
+
+        function applyFilters() {
+            const { events, incidents } = filteredData();
+            renderReports(events, incidents);
+            setStatus("Filters applied.");
+        }
+
+        function clearFilters() {
+            document.getElementById("app-filter").value = "";
+            document.getElementById("role-filter").value = "";
+            renderReports(allEvents, allIncidents);
+            setStatus("Filters cleared.");
+        }
+
+        async function downloadExport(url, filename) {
+            try {
+                setStatus("Preparing export...");
+
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: getAuthHeaders()
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Export failed: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(blobUrl);
+
+                setStatus(`Downloaded ${filename}`);
+            } catch (error) {
+                console.error(error);
+                setStatus("Export failed. Check backend export routes.", true);
+            }
+        }
+
+        async function loadReportsPage() {
+            const refreshBtn = document.getElementById("refresh-report-btn");
+
+            try {
+                refreshBtn.disabled = true;
+                setStatus("Loading report data...");
+
+                const [events, incidents] = await Promise.all([
+                    fetchEvents(),
+                    fetchIncidents()
+                ]);
+
+                allEvents = events;
+                allIncidents = incidents;
+
+                renderReports(allEvents, allIncidents);
+                setStatus("Report loaded successfully.");
+            } catch (error) {
+                console.error(error);
+
+                renderMetricList("summary-breakdown", [], "Failed to load report data.");
+                renderMetricList("severity-breakdown", [], "Failed to load severity data.");
+                renderMetricList("app-breakdown", [], "Failed to load application data.");
+                renderMetricList("role-breakdown", [], "Failed to load role data.");
+                setStatus("Failed to load reports.", true);
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        function bindEvents() {
+            document.getElementById("refresh-report-btn").addEventListener("click", loadReportsPage);
+            document.getElementById("apply-filters-btn").addEventListener("click", applyFilters);
+            document.getElementById("clear-filters-btn").addEventListener("click", clearFilters);
+            document.getElementById("logout-link").addEventListener("click", function (e) {
+                e.preventDefault();
+                logout();
+            });
+
+            document.querySelectorAll(".export-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    downloadExport(btn.dataset.url, btn.dataset.filename);
+                });
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            bindEvents();
+            const ok = await ensureLoggedIn();
+            if (!ok) return;
+            await loadReportsPage();
+        });
     </script>
 </body>
 

@@ -161,7 +161,8 @@
             cursor: pointer;
         }
 
-        .toolbar button:hover {
+        .toolbar button:hover,
+        .toolbar select:hover {
             background: rgba(255, 255, 255, 0.04);
         }
 
@@ -199,6 +200,7 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 700;
+            text-transform: capitalize;
         }
 
         .low {
@@ -243,7 +245,8 @@
         .empty {
             color: var(--muted);
             font-size: 14px;
-            padding: 8px 0;
+            padding: 16px 0;
+            text-align: center;
         }
 
         .action-buttons {
@@ -264,6 +267,11 @@
 
         .btn-small:hover {
             background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-small:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
 
         @media (max-width: 1100px) {
@@ -298,13 +306,10 @@
             <nav class="nav">
                 <a href="/dashboard">Dashboard</a>
                 <a href="/testing">Testing</a>
-                <a href="/incidents">Incidents</a>
+                <a href="/incidents" class="active">Incidents</a>
                 <a href="/reports">Reports</a>
-
-                <!-- Admin only -->
                 <a href="/policy-editor" id="policy-link" hidden>Policy Editor</a>
-
-                <a href="#" onclick="logout()">Logout</a>
+                <a href="#" id="logout-link">Logout</a>
             </nav>
         </aside>
 
@@ -322,9 +327,9 @@
             </div>
 
             <div class="toolbar">
-                <button onclick="loadIncidentsPage()">Refresh</button>
+                <button id="refresh-btn" type="button">Refresh</button>
 
-                <select id="status-filter" onchange="loadIncidents()">
+                <select id="status-filter">
                     <option value="">All Status</option>
                     <option value="open">Open</option>
                     <option value="acknowledged">Acknowledged</option>
@@ -395,8 +400,11 @@
 
         function getAuthHeaders(json = false) {
             const token = getToken();
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = {};
+
+            if (token) headers["Authorization"] = `Bearer ${token}`;
             if (json) headers["Content-Type"] = "application/json";
+
             return headers;
         }
 
@@ -404,6 +412,71 @@
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(USER_KEY);
             window.location.href = "/login";
+        }
+
+        function formatDateTime(value) {
+            if (!value) return "—";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
+        }
+
+        function normalizeIncidents(payload) {
+            if (Array.isArray(payload)) return payload;
+            if (Array.isArray(payload.incidents)) return payload.incidents;
+            if (Array.isArray(payload.data)) return payload.data;
+            if (Array.isArray(payload.items)) return payload.items;
+            return [];
+        }
+
+        async function apiGet(url) {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            if (!response.ok) {
+                throw new Error(`GET ${url} failed with ${response.status}`);
+            }
+
+            return response.json();
+        }
+
+        async function apiUpdate(url, body) {
+            const methods = ["PATCH", "PUT", "POST"];
+
+            for (const method of methods) {
+                try {
+                    const response = await fetch(url, {
+                        method,
+                        headers: getAuthHeaders(true),
+                        body: JSON.stringify(body)
+                    });
+
+                    if (response.status === 401) {
+                        logout();
+                        throw new Error("Unauthorized");
+                    }
+
+                    if (response.ok) {
+                        const text = await response.text();
+                        try {
+                            return text ? JSON.parse(text) : {};
+                        } catch {
+                            return {};
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`${method} ${url} failed`, error);
+                }
+            }
+
+            throw new Error(`Unable to update incident at ${url}`);
         }
 
         async function ensureLoggedIn() {
@@ -414,40 +487,197 @@
             }
 
             try {
-                const response = await fetch("/auth/me", {
-                    headers: getAuthHeaders()
-                });
-
-                if (!response.ok) {
-                    logout();
-                    return false;
-                }
-
-                const user = await response.json();
+                const user = await apiGet("/auth/me");
 
                 const usernameEl = document.getElementById("current-username");
                 const roleEl = document.getElementById("current-role");
+                const policyLink = document.getElementById("policy-link");
 
-                if (usernameEl) usernameEl.textContent = user.username;
-                if (roleEl) roleEl.textContent = user.role;
+                if (usernameEl) usernameEl.textContent = user.username || "User";
+                if (roleEl) roleEl.textContent = user.role || "member";
+                if (policyLink) policyLink.hidden = user.role !== "admin";
 
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
-
-                // 🔐 Admin-only Policy Editor
-                const policyLink = document.getElementById("policy-link");
-                if (policyLink) {
-                    policyLink.hidden = user.role !== "admin";
-                }
-
                 return user;
-
             } catch (error) {
                 logout();
                 return false;
             }
         }
 
-        ensureLoggedIn();
+        function updateSummaryCards(incidents) {
+            const total = incidents.length;
+            const open = incidents.filter(i => (i.status || "").toLowerCase() === "open").length;
+            const acknowledged = incidents.filter(i => (i.status || "").toLowerCase() === "acknowledged").length;
+            const resolved = incidents.filter(i => (i.status || "").toLowerCase() === "resolved").length;
+
+            document.getElementById("total-incidents").textContent = total;
+            document.getElementById("open-incidents").textContent = open;
+            document.getElementById("ack-incidents").textContent = acknowledged;
+            document.getElementById("resolved-incidents").textContent = resolved;
+        }
+
+        function buildActionButtons(incident) {
+            const status = (incident.status || "").toLowerCase();
+            const id = incident.id ?? incident.incident_id ?? incident._id ?? "";
+
+            return `
+                <div class="action-buttons">
+                    <button
+                        class="btn-small"
+                        type="button"
+                        onclick="updateIncidentStatus('${id}', 'acknowledged')"
+                        ${status === "acknowledged" || status === "resolved" ? "disabled" : ""}>
+                        Acknowledge
+                    </button>
+                    <button
+                        class="btn-small"
+                        type="button"
+                        onclick="updateIncidentStatus('${id}', 'resolved')"
+                        ${status === "resolved" ? "disabled" : ""}>
+                        Resolve
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderIncidents(incidents) {
+            const tbody = document.getElementById("incidents-body");
+
+            if (!incidents.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty">No incidents found.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = incidents.map((incident) => {
+                const id = incident.id ?? incident.incident_id ?? incident._id ?? "—";
+                const time = incident.timestamp ?? incident.time ?? incident.created_at ?? incident.date ?? "—";
+                const type = incident.type ?? incident.incident_type ?? "Unknown";
+                const severity = (incident.severity ?? "low").toLowerCase();
+                const status = (incident.status ?? "open").toLowerCase();
+                const tool = incident.tool ?? incident.source ?? "—";
+                const reason = incident.reason ?? incident.description ?? incident.message ?? "—";
+
+                return `
+                    <tr>
+                        <td>${id}</td>
+                        <td>${formatDateTime(time)}</td>
+                        <td>${type}</td>
+                        <td><span class="pill ${severity}">${severity}</span></td>
+                        <td><span class="pill ${status}">${status}</span></td>
+                        <td>${tool}</td>
+                        <td>${reason}</td>
+                        <td>${buildActionButtons(incident)}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function fetchIncidents() {
+            const endpoints = [
+                "/api/incidents",
+                "/incidents/data",
+                "/incidents/list"
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    const payload = await apiGet(endpoint);
+                    return normalizeIncidents(payload);
+                } catch (error) {
+                    console.warn(`Failed to load from ${endpoint}`, error);
+                }
+            }
+
+            throw new Error("No incident API endpoint responded.");
+        }
+
+        async function loadIncidents() {
+            const tbody = document.getElementById("incidents-body");
+            const filterValue = document.getElementById("status-filter").value.trim().toLowerCase();
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="empty">Loading incidents...</td>
+                </tr>
+            `;
+
+            try {
+                let incidents = await fetchIncidents();
+
+                updateSummaryCards(incidents);
+
+                if (filterValue) {
+                    incidents = incidents.filter(i => (i.status || "").toLowerCase() === filterValue);
+                }
+
+                renderIncidents(incidents);
+            } catch (error) {
+                console.error(error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty">Failed to load incidents. Check your backend incident API route.</td>
+                    </tr>
+                `;
+            }
+        }
+
+        async function updateIncidentStatus(id, status) {
+            if (!id) {
+                alert("Incident ID is missing.");
+                return;
+            }
+
+            const endpoints = [
+                `/api/incidents/${id}`,
+                `/incidents/${id}`,
+                `/incidents/update/${id}`
+            ];
+
+            let updated = false;
+
+            for (const endpoint of endpoints) {
+                try {
+                    await apiUpdate(endpoint, { status });
+                    updated = true;
+                    break;
+                } catch (error) {
+                    console.warn(`Failed to update via ${endpoint}`, error);
+                }
+            }
+
+            if (!updated) {
+                alert("Could not update incident status. Backend route may be missing.");
+                return;
+            }
+
+            await loadIncidents();
+        }
+
+        function bindEvents() {
+            const refreshBtn = document.getElementById("refresh-btn");
+            const statusFilter = document.getElementById("status-filter");
+            const logoutLink = document.getElementById("logout-link");
+
+            refreshBtn.addEventListener("click", loadIncidents);
+            statusFilter.addEventListener("change", loadIncidents);
+            logoutLink.addEventListener("click", function (e) {
+                e.preventDefault();
+                logout();
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            bindEvents();
+            const user = await ensureLoggedIn();
+            if (user) {
+                await loadIncidents();
+            }
+        });
     </script>
 </body>
 
