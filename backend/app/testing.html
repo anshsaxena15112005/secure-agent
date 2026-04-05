@@ -145,7 +145,8 @@
         .field textarea,
         .toolbar button,
         .result-actions button,
-        .scenario-grid button {
+        .scenario-grid button,
+        .demo-grid button {
             width: 100%;
             border: 1px solid var(--line);
             background: rgba(255, 255, 255, 0.03);
@@ -168,20 +169,23 @@
 
         .toolbar button,
         .result-actions button,
-        .scenario-grid button {
+        .scenario-grid button,
+        .demo-grid button {
             cursor: pointer;
             background: var(--panel);
         }
 
         .toolbar button:hover,
         .result-actions button:hover,
-        .scenario-grid button:hover {
+        .scenario-grid button:hover,
+        .demo-grid button:hover {
             background: rgba(255, 255, 255, 0.05);
         }
 
         .toolbar button:disabled,
         .result-actions button:disabled,
-        .scenario-grid button:disabled {
+        .scenario-grid button:disabled,
+        .demo-grid button:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
@@ -335,7 +339,8 @@
             margin-top: 6px;
         }
 
-        .scenario-grid {
+        .scenario-grid,
+        .demo-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
@@ -363,7 +368,8 @@
             }
 
             .stats-grid,
-            .scenario-grid {
+            .scenario-grid,
+            .demo-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -389,7 +395,7 @@
             <div class="topbar">
                 <div>
                     <h1>Testing Lab</h1>
-                    <p>Run manual agent tests and automated red-team simulations</p>
+                    <p>Run manual agent tests, red-team simulations, and demo data controls</p>
                 </div>
 
                 <div class="user-box">
@@ -506,6 +512,15 @@
             </section>
 
             <section class="card">
+                <h2 class="section-title">Demo Controls</h2>
+                <div class="demo-grid">
+                    <button type="button" id="seed-demo-btn">Seed Demo Data</button>
+                    <button type="button" id="clear-demo-btn">Clear Demo Data</button>
+                </div>
+                <div class="status-line" id="demo-status">Use these controls to quickly populate the platform for demo runs.</div>
+            </section>
+
+            <section class="card">
                 <h2 class="section-title">Recent Test History</h2>
                 <div class="history-list" id="test-history">
                     <div class="muted">Loading recent test history...</div>
@@ -585,6 +600,15 @@
                 document.getElementById("current-role").textContent = user.role || "member";
                 document.getElementById("policy-link").hidden = user.role !== "admin";
 
+                const seedBtn = document.getElementById("seed-demo-btn");
+                const clearBtn = document.getElementById("clear-demo-btn");
+
+                if (user.role !== "admin") {
+                    seedBtn.disabled = true;
+                    clearBtn.disabled = true;
+                    setDemoStatus("Demo controls are restricted to admin users.");
+                }
+
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
                 return user;
             } catch (error) {
@@ -599,6 +623,10 @@
 
         function setRedTeamStatus(message) {
             document.getElementById("redteam-status").textContent = message;
+        }
+
+        function setDemoStatus(message) {
+            document.getElementById("demo-status").textContent = message;
         }
 
         function prettyJson(data) {
@@ -642,13 +670,6 @@
             document.getElementById("goal").value = "";
             document.getElementById("manual-result").textContent = "Run a manual test to see the backend response.";
             setManualStatus("Cleared manual test.");
-        }
-
-        function statusTag(status) {
-            const s = (status || "").toLowerCase();
-            if (s === "ok") return "ok";
-            if (s === "blocked") return "blocked";
-            return "error";
         }
 
         function severityTag(severity) {
@@ -796,6 +817,62 @@
             }
         }
 
+        async function seedDemoData() {
+            const btn = document.getElementById("seed-demo-btn");
+            btn.disabled = true;
+            setDemoStatus("Seeding demo data...");
+
+            try {
+                const response = await apiPost("/demo/seed", {});
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setDemoStatus(data.detail || "Failed to seed demo data.");
+                    return;
+                }
+
+                setDemoStatus(`Seeded ${data.seeded_events} events and ${data.seeded_incidents} incidents.`);
+                await loadRecentHistory();
+            } catch (error) {
+                console.error(error);
+                setDemoStatus("Unable to connect to the server.");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function clearDemoData() {
+            const confirmed = confirm("Clear all current events and incidents?");
+            if (!confirmed) return;
+
+            const btn = document.getElementById("clear-demo-btn");
+            btn.disabled = true;
+            setDemoStatus("Clearing demo data...");
+
+            try {
+                const response = await apiPost("/demo/clear", {});
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setDemoStatus(data.detail || "Failed to clear demo data.");
+                    return;
+                }
+
+                setDemoStatus(`Cleared ${data.deleted_events} events and ${data.deleted_incidents} incidents.`);
+                document.getElementById("redteam-results").innerHTML = `<div class="muted">Run the suite to see results.</div>`;
+                document.getElementById("rt-total").textContent = 0;
+                document.getElementById("rt-blocked").textContent = 0;
+                document.getElementById("rt-allowed").textContent = 0;
+                document.getElementById("rt-errors").textContent = 0;
+                await loadRecentHistory();
+            } catch (error) {
+                console.error(error);
+                setDemoStatus("Unable to connect to the server.");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         async function loadRecentHistory() {
             const container = document.getElementById("test-history");
             container.innerHTML = `<div class="muted">Loading recent test history...</div>`;
@@ -853,6 +930,8 @@
             document.getElementById("copy-result-btn").addEventListener("click", copyManualResult);
             document.getElementById("run-redteam-btn").addEventListener("click", runRedTeamSuite);
             document.getElementById("refresh-history-btn").addEventListener("click", loadRecentHistory);
+            document.getElementById("seed-demo-btn").addEventListener("click", seedDemoData);
+            document.getElementById("clear-demo-btn").addEventListener("click", clearDemoData);
         }
 
         async function initPage() {

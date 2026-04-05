@@ -109,6 +109,31 @@
             font-size: 14px;
         }
 
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .toolbar button:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .toolbar button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .grid-cards {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -219,29 +244,17 @@
             padding: 8px 0;
         }
 
-        .toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
+        .status-box {
+            min-height: 20px;
+            font-size: 14px;
+            color: var(--muted);
+            margin-top: 10px;
         }
 
-        .toolbar button {
-            border: 1px solid var(--line);
-            background: var(--panel);
-            color: var(--text);
-            padding: 10px 14px;
-            border-radius: 12px;
-            cursor: pointer;
-        }
-
-        .toolbar button:hover {
-            background: rgba(255,255,255,0.04);
-        }
-
-        .toolbar button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
 
         @media (max-width: 1100px) {
@@ -250,6 +263,10 @@
             }
 
             .section-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .demo-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -376,6 +393,15 @@
                     </div>
                 </div>
             </section>
+
+            <section class="card">
+                <h2 class="section-title">Demo Controls</h2>
+                <div class="demo-grid">
+                    <button id="seed-demo-btn" type="button">Seed Demo Data</button>
+                    <button id="clear-demo-btn" type="button">Clear Demo Data</button>
+                </div>
+                <div class="status-box" id="demo-status">Use these controls to populate the platform for demos.</div>
+            </section>
         </main>
     </div>
 
@@ -421,6 +447,10 @@
             window.location.href = "/login";
         }
 
+        function setDemoStatus(message) {
+            document.getElementById("demo-status").textContent = message;
+        }
+
         async function fetchJson(url) {
             const response = await fetch(url, {
                 method: "GET",
@@ -456,6 +486,15 @@
                 const policyLink = document.getElementById("policy-link");
                 if (policyLink) {
                     policyLink.hidden = user.role !== "admin";
+                }
+
+                const seedBtn = document.getElementById("seed-demo-btn");
+                const clearBtn = document.getElementById("clear-demo-btn");
+
+                if (user.role !== "admin") {
+                    seedBtn.disabled = true;
+                    clearBtn.disabled = true;
+                    setDemoStatus("Demo controls are restricted to admin users.");
                 }
 
                 return true;
@@ -637,6 +676,78 @@
             }
         }
 
+        async function seedDemoData() {
+            const btn = document.getElementById("seed-demo-btn");
+            btn.disabled = true;
+            setDemoStatus("Seeding demo data...");
+
+            try {
+                const response = await fetch("/demo/seed", {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({})
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setDemoStatus(data.detail || "Failed to seed demo data.");
+                    return;
+                }
+
+                setDemoStatus(`Seeded ${data.seeded_events} events and ${data.seeded_incidents} incidents.`);
+                await loadDashboard();
+            } catch (error) {
+                console.error(error);
+                setDemoStatus("Unable to connect to the server.");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function clearDemoData() {
+            const confirmed = confirm("Clear all current events and incidents?");
+            if (!confirmed) return;
+
+            const btn = document.getElementById("clear-demo-btn");
+            btn.disabled = true;
+            setDemoStatus("Clearing demo data...");
+
+            try {
+                const response = await fetch("/demo/clear", {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({})
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setDemoStatus(data.detail || "Failed to clear demo data.");
+                    return;
+                }
+
+                setDemoStatus(`Cleared ${data.deleted_events} events and ${data.deleted_incidents} incidents.`);
+                document.getElementById("live-alert-feed").innerHTML = `<div class="empty">Waiting for live alerts...</div>`;
+                await loadDashboard();
+            } catch (error) {
+                console.error(error);
+                setDemoStatus("Unable to connect to the server.");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         function connectAlertSocket() {
             const protocol = window.location.protocol === "https:" ? "wss" : "ws";
             const socketUrl = `${protocol}://${window.location.host}/ws/alerts`;
@@ -695,6 +806,8 @@
         function bindEvents() {
             document.getElementById("refresh-dashboard-btn").addEventListener("click", loadDashboard);
             document.getElementById("redteam-btn").addEventListener("click", runQuickRedTeam);
+            document.getElementById("seed-demo-btn").addEventListener("click", seedDemoData);
+            document.getElementById("clear-demo-btn").addEventListener("click", clearDemoData);
             document.getElementById("logout-link").addEventListener("click", function (e) {
                 e.preventDefault();
                 logout();
