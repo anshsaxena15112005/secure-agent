@@ -15,6 +15,7 @@
             --muted: #93a3af;
             --success: #8dd4a1;
             --danger: #ef9b9b;
+            --warning: #e8c374;
             --shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
         }
 
@@ -141,6 +142,12 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
+        .toolbar button:disabled,
+        .history-item button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         textarea {
             width: 100%;
             min-height: 520px;
@@ -161,6 +168,11 @@
             box-shadow: 0 0 0 3px rgba(135, 170, 178, 0.08);
         }
 
+        textarea.dirty {
+            border-color: rgba(232, 195, 116, 0.35);
+            box-shadow: 0 0 0 3px rgba(232, 195, 116, 0.06);
+        }
+
         .status {
             min-height: 24px;
             margin-top: 12px;
@@ -174,6 +186,10 @@
 
         .status.error {
             color: var(--danger);
+        }
+
+        .status.warning {
+            color: var(--warning);
         }
 
         .hint {
@@ -225,6 +241,44 @@
             padding: 8px 0;
         }
 
+        .validation-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .badge.valid {
+            background: rgba(79, 163, 108, 0.15);
+            color: #8dd4a1;
+        }
+
+        .badge.invalid {
+            background: rgba(212, 106, 106, 0.16);
+            color: #ef9b9b;
+        }
+
+        .badge.changed {
+            background: rgba(215, 165, 75, 0.16);
+            color: #e8c374;
+        }
+
+        .badge.clean {
+            background: rgba(255, 255, 255, 0.06);
+            color: #c6d2d8;
+        }
+
         @media (max-width: 760px) {
             .layout {
                 grid-template-columns: 1fr;
@@ -266,7 +320,7 @@
                 <a href="/incidents">Incidents</a>
                 <a href="/reports">Reports</a>
                 <a href="/policy-editor" id="policy-link" class="active" hidden>Policy Editor</a>
-                <a href="#" onclick="logout()">Logout</a>
+                <a href="#" id="logout-link">Logout</a>
             </nav>
         </aside>
 
@@ -289,13 +343,23 @@
                 </div>
 
                 <div class="toolbar">
-                    <button type="button" onclick="loadPolicy()">Load</button>
-                    <button type="button" onclick="savePolicy()">Save</button>
-                    <button type="button" onclick="reloadPolicyOnly()">Reload</button>
-                    <button type="button" onclick="resetPolicy()">Reset</button>
+                    <button type="button" id="load-btn">Load</button>
+                    <button type="button" id="save-btn">Save</button>
+                    <button type="button" id="reload-btn">Reload</button>
+                    <button type="button" id="reset-btn">Reset</button>
                 </div>
 
                 <textarea id="policy-content" placeholder="Policy YAML will appear here..."></textarea>
+
+                <div class="validation-row">
+                    <div>
+                        <span id="yaml-badge" class="badge clean">Unknown</span>
+                    </div>
+                    <div>
+                        <span id="dirty-badge" class="badge clean">No changes</span>
+                    </div>
+                </div>
+
                 <div class="status" id="status-msg"></div>
             </section>
 
@@ -312,16 +376,18 @@
         const TOKEN_KEY = "secureagent_token";
         const USER_KEY = "secureagent_user";
 
+        let originalPolicyText = "";
+        let isYamlProbablyValid = true;
+
         function getToken() {
             return localStorage.getItem(TOKEN_KEY);
         }
 
         function getAuthHeaders(json = false) {
             const token = getToken();
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            if (json) {
-                headers["Content-Type"] = "application/json";
-            }
+            const headers = {};
+            if (token) headers.Authorization = `Bearer ${token}`;
+            if (json) headers["Content-Type"] = "application/json";
             return headers;
         }
 
@@ -342,9 +408,100 @@
 
         function formatTimestamp(ts) {
             if (!ts) return "Unknown time";
-            const date = new Date(ts * 1000);
+            const millis = ts < 1000000000000 ? ts * 1000 : ts;
+            const date = new Date(millis);
             if (Number.isNaN(date.getTime())) return "Unknown time";
             return date.toLocaleString();
+        }
+
+        function updateDirtyState() {
+            const textarea = document.getElementById("policy-content");
+            const dirtyBadge = document.getElementById("dirty-badge");
+            const changed = textarea.value !== originalPolicyText;
+
+            if (changed) {
+                textarea.classList.add("dirty");
+                dirtyBadge.textContent = "Unsaved changes";
+                dirtyBadge.className = "badge changed";
+            } else {
+                textarea.classList.remove("dirty");
+                dirtyBadge.textContent = "No changes";
+                dirtyBadge.className = "badge clean";
+            }
+        }
+
+        function basicYamlCheck(text) {
+            if (!text.trim()) {
+                return { valid: false, message: "Policy content is empty." };
+            }
+
+            const lines = text.split("\n");
+            let bracketBalance = 0;
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith("#")) continue;
+
+                for (const ch of trimmed) {
+                    if (ch === "[" || ch === "{") bracketBalance++;
+                    if (ch === "]" || ch === "}") bracketBalance--;
+                }
+
+                if (trimmed.includes(":") || trimmed.startsWith("- ") || trimmed.startsWith("---")) {
+                    continue;
+                }
+            }
+
+            if (bracketBalance !== 0) {
+                return { valid: false, message: "Possible bracket mismatch in YAML." };
+            }
+
+            return { valid: true, message: "YAML looks structurally valid." };
+        }
+
+        function updateYamlValidation() {
+            const textarea = document.getElementById("policy-content");
+            const badge = document.getElementById("yaml-badge");
+            const result = basicYamlCheck(textarea.value);
+
+            isYamlProbablyValid = result.valid;
+
+            if (result.valid) {
+                badge.textContent = "YAML looks valid";
+                badge.className = "badge valid";
+            } else {
+                badge.textContent = "YAML needs review";
+                badge.className = "badge invalid";
+            }
+        }
+
+        async function apiGet(url) {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            return response;
+        }
+
+        async function apiPost(url, body = null, json = true) {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: getAuthHeaders(json),
+                body: json ? JSON.stringify(body || {}) : null
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            return response;
         }
 
         async function ensureLoggedIn() {
@@ -355,10 +512,7 @@
             }
 
             try {
-                const response = await fetch("/auth/me", {
-                    headers: getAuthHeaders()
-                });
-
+                const response = await apiGet("/auth/me");
                 if (!response.ok) {
                     logout();
                     return false;
@@ -368,17 +522,13 @@
 
                 const usernameEl = document.getElementById("current-username");
                 const roleEl = document.getElementById("current-role");
+                const policyLink = document.getElementById("policy-link");
 
-                if (usernameEl) usernameEl.textContent = user.username;
-                if (roleEl) roleEl.textContent = user.role;
+                if (usernameEl) usernameEl.textContent = user.username || "User";
+                if (roleEl) roleEl.textContent = user.role || "member";
+                if (policyLink) policyLink.hidden = user.role !== "admin";
 
                 localStorage.setItem(USER_KEY, JSON.stringify(user));
-
-                const policyLink = document.getElementById("policy-link");
-                if (policyLink) {
-                    policyLink.hidden = user.role !== "admin";
-                }
-
                 return user;
             } catch (error) {
                 logout();
@@ -390,15 +540,7 @@
             setStatus("Loading policy...");
 
             try {
-                const response = await fetch("/security/policy/raw", {
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                const response = await apiGet("/security/policy/raw");
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -406,15 +548,26 @@
                     return;
                 }
 
-                document.getElementById("policy-content").value = data.content || "";
+                const textarea = document.getElementById("policy-content");
+                textarea.value = data.content || "";
+                originalPolicyText = textarea.value;
+
+                updateDirtyState();
+                updateYamlValidation();
                 setStatus("Policy loaded successfully.", "success");
             } catch (error) {
+                console.error(error);
                 setStatus("Unable to connect to the server.", "error");
             }
         }
 
         async function savePolicy() {
             const content = document.getElementById("policy-content").value;
+
+            if (!content.trim()) {
+                setStatus("Policy content cannot be empty.", "error");
+                return;
+            }
 
             const confirmed = confirm(
                 "Are you sure you want to update the security policy?\n\n" +
@@ -428,18 +581,11 @@
 
             setStatus("Saving policy...");
 
+            const saveBtn = document.getElementById("save-btn");
+            saveBtn.disabled = true;
+
             try {
-                const response = await fetch("/security/policy/update", {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({ content })
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                const response = await apiPost("/security/policy/update", { content });
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -447,37 +593,46 @@
                     return;
                 }
 
-                setStatus("Policy updated successfully.", "success");
+                originalPolicyText = content;
+                updateDirtyState();
+                await reloadPolicyOnly(true);
                 await loadHistory();
+                setStatus("Policy updated and reloaded successfully.", "success");
             } catch (error) {
+                console.error(error);
                 setStatus("Unable to connect to the server.", "error");
+            } finally {
+                saveBtn.disabled = false;
             }
         }
 
-        async function reloadPolicyOnly() {
-            setStatus("Reloading policy...");
+        async function reloadPolicyOnly(silent = false) {
+            if (!silent) {
+                setStatus("Reloading policy...");
+            }
+
+            const reloadBtn = document.getElementById("reload-btn");
+            reloadBtn.disabled = true;
 
             try {
-                const response = await fetch("/security/policy/reload", {
-                    method: "POST",
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                const response = await apiPost("/security/policy/reload", {}, false);
                 const data = await response.json();
 
                 if (!response.ok) {
                     setStatus(data.detail || "Failed to reload policy.", "error");
-                    return;
+                    return false;
                 }
 
-                setStatus("Policy reloaded successfully.", "success");
+                if (!silent) {
+                    setStatus("Policy reloaded successfully.", "success");
+                }
+                return true;
             } catch (error) {
+                console.error(error);
                 setStatus("Unable to connect to the server.", "error");
+                return false;
+            } finally {
+                reloadBtn.disabled = false;
             }
         }
 
@@ -494,17 +649,11 @@
 
             setStatus("Resetting policy...");
 
+            const resetBtn = document.getElementById("reset-btn");
+            resetBtn.disabled = true;
+
             try {
-                const response = await fetch("/security/policy/reset", {
-                    method: "POST",
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                const response = await apiPost("/security/policy/reset", {}, false);
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -516,23 +665,19 @@
                 await loadHistory();
                 setStatus("Policy reset successfully.", "success");
             } catch (error) {
+                console.error(error);
                 setStatus("Unable to connect to the server.", "error");
+            } finally {
+                resetBtn.disabled = false;
             }
         }
 
         async function loadHistory() {
+            const container = document.getElementById("history-list");
+
             try {
-                const response = await fetch("/security/policy/history", {
-                    headers: getAuthHeaders()
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                const response = await apiGet("/security/policy/history");
                 const data = await response.json();
-                const container = document.getElementById("history-list");
 
                 if (!response.ok) {
                     container.innerHTML = `<div class="empty">Failed to load history.</div>`;
@@ -550,17 +695,22 @@
                             <div class="history-name">${v.name}</div>
                             <div class="history-time">${formatTimestamp(v.timestamp)}</div>
                         </div>
-                        <button type="button" onclick="restoreVersion('${v.name}')">Restore</button>
+                        <button type="button" data-version="${v.name}" class="restore-btn">Restore</button>
                     </div>
                 `).join("");
-            } catch (e) {
-                document.getElementById("history-list").innerHTML = `<div class="empty">Error loading history.</div>`;
+
+                document.querySelectorAll(".restore-btn").forEach(btn => {
+                    btn.addEventListener("click", () => restoreVersion(btn.dataset.version));
+                });
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<div class="empty">Error loading history.</div>`;
             }
         }
 
         async function restoreVersion(version) {
             const confirmed = confirm(
-                "Restore this version?\n\nCurrent policy will be replaced."
+                `Restore version "${version}"?\n\nCurrent policy will be replaced.`
             );
 
             if (!confirmed) return;
@@ -568,38 +718,70 @@
             setStatus("Restoring policy...");
 
             try {
-                const response = await fetch("/security/policy/restore", {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({ version })
-                });
-
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                const response = await apiPost("/security/policy/restore", { version });
                 const data = await response.json();
 
                 if (!response.ok) {
-                    setStatus(data.detail || "Restore failed", "error");
+                    setStatus(data.detail || "Restore failed.", "error");
                     return;
                 }
 
                 await loadPolicy();
                 await loadHistory();
-                setStatus("Policy restored successfully.", "success");
-            } catch (e) {
-                setStatus("Server error", "error");
+                await reloadPolicyOnly(true);
+                setStatus("Policy restored and reloaded successfully.", "success");
+            } catch (error) {
+                console.error(error);
+                setStatus("Server error.", "error");
             }
         }
 
+        function handleEditorInput() {
+            updateDirtyState();
+            updateYamlValidation();
+
+            if (!isYamlProbablyValid) {
+                setStatus("YAML needs review before saving.", "warning");
+            } else if (document.getElementById("policy-content").value !== originalPolicyText) {
+                setStatus("You have unsaved changes.", "warning");
+            } else {
+                setStatus("Policy is loaded and unchanged.");
+            }
+        }
+
+        function bindEvents() {
+            document.getElementById("logout-link").addEventListener("click", function (e) {
+                e.preventDefault();
+                logout();
+            });
+
+            document.getElementById("load-btn").addEventListener("click", loadPolicy);
+            document.getElementById("save-btn").addEventListener("click", savePolicy);
+            document.getElementById("reload-btn").addEventListener("click", () => reloadPolicyOnly(false));
+            document.getElementById("reset-btn").addEventListener("click", resetPolicy);
+            document.getElementById("policy-content").addEventListener("input", handleEditorInput);
+
+            window.addEventListener("beforeunload", function (e) {
+                if (document.getElementById("policy-content").value !== originalPolicyText) {
+                    e.preventDefault();
+                    e.returnValue = "";
+                }
+            });
+        }
+
         async function initPage() {
+            bindEvents();
+
             const user = await ensureLoggedIn();
             if (!user) return;
 
             if (user.role !== "admin") {
                 setStatus("Access restricted to admin users.", "error");
+                document.getElementById("policy-content").disabled = true;
+                document.getElementById("load-btn").disabled = true;
+                document.getElementById("save-btn").disabled = true;
+                document.getElementById("reload-btn").disabled = true;
+                document.getElementById("reset-btn").disabled = true;
                 return;
             }
 
@@ -607,7 +789,7 @@
             await loadHistory();
         }
 
-        initPage();
+        document.addEventListener("DOMContentLoaded", initPage);
     </script>
 </body>
 </html>
