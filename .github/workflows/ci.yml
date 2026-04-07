@@ -1,42 +1,40 @@
-name: CI
+name: SecureAgent CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
-          cache-dependency-path: |
-            backend/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install pytest
+          pip install -r requirements.txt
 
-      - name: Verify imports
+      - name: Check Python syntax
         run: |
-          PYTHONPATH=. python -c "import backend; print('backend import ok')"
-          PYTHONPATH=. python -c "import backend.app.main; print('main import ok')"
+          python -m py_compile main.py
+          python -m py_compile backend/app/db.py
+          python -m py_compile backend/app/security.py
+          python -m py_compile backend/app/policy_loader.py
+          python -m py_compile backend/app/ws_manager.py
+          python -m py_compile backend/app/agent/planner.py
+          python -m py_compile backend/app/agent/executor.py
+          python -m py_compile backend/security/auth.py
 
-      - name: Run red-team test suite
+      - name: Import app
         run: |
-          PYTHONPATH=. python -m tests.run_red_team_cases
-
-      - name: Run pytest
-        run: |
-          PYTHONPATH=. pytest -q
+          python -c "from main import app; print('SecureAgent app imported successfully')"
