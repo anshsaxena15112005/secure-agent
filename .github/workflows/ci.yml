@@ -35,6 +35,6 @@ jobs:
           python -m py_compile backend/app/agent/executor.py
           python -m py_compile backend/security/auth.py
 
-      - name: Import app
+      - name: Run tests
         run: |
-          python -c "from main import app; print('SecureAgent app imported successfully')"
+          pytest -q
