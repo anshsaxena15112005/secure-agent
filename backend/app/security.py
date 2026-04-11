@@ -14,6 +14,7 @@ HIGH_RISK_TOOLS = set(policy.get("high_risk_tools", []))
 
 RISK_CONFIG = policy.get("risk_thresholds", {})
 BLOCK_THRESHOLD = RISK_CONFIG.get("block", 60)
+INCIDENT_THRESHOLD = RISK_CONFIG.get("incident", 60)
 CRITICAL_THRESHOLD = RISK_CONFIG.get("critical", 80)
 OUTPUT_BLOCK_THRESHOLD = RISK_CONFIG.get("output_block", 70)
 OUTPUT_REDACT_THRESHOLD = RISK_CONFIG.get("output_redact", 30)
@@ -47,7 +48,8 @@ def _calculate_severity(risk: int) -> str:
 
 
 def analyze_prompt(text: str) -> Dict[str, Any]:
-    prompt = text or ""
+    prompt = (text or "").strip()
+
     matched_injection = _match_patterns(prompt, PROMPT_INJECTION_PATTERNS)
     matched_secrets = _match_patterns(prompt, SECRET_PATTERNS)
     matched_pii = _match_patterns(prompt, PII_PATTERNS)
@@ -56,16 +58,38 @@ def analyze_prompt(text: str) -> Dict[str, Any]:
     reasons = []
 
     if matched_injection:
-        risk += 50
-        reasons.append("Prompt injection indicators detected")
+        risk += 70
+        reasons.append("Prompt injection or jailbreak indicators detected")
 
     if matched_secrets:
-        risk += 30
+        risk += 25
         reasons.append("Secret extraction indicators detected")
 
     if matched_pii:
         risk += 20
         reasons.append("Possible PII pattern detected")
+
+    normalized_prompt = prompt.lower()
+
+    high_confidence_phrases = [
+        "ignore all previous instructions",
+        "ignore previous instructions",
+        "reveal system prompt",
+        "show system prompt",
+        "print system prompt",
+        "forget your instructions",
+        "act as unrestricted",
+        "bypass safety",
+        "developer mode",
+        "disable safety",
+        "override rules",
+        "jailbreak",
+    ]
+
+    explicit_matches = [phrase for phrase in high_confidence_phrases if phrase in normalized_prompt]
+    if explicit_matches:
+        risk = max(risk, 85)
+        reasons.append("High-confidence jailbreak or system-prompt extraction attempt detected")
 
     risk = min(risk, 100)
     severity = _calculate_severity(risk)
@@ -78,6 +102,7 @@ def analyze_prompt(text: str) -> Dict[str, Any]:
         "reasons": reasons,
         "matches": {
             "prompt_injection": matched_injection,
+            "high_confidence": explicit_matches,
             "secrets": matched_secrets,
             "pii": matched_pii,
         },
@@ -180,6 +205,7 @@ def get_policy_status() -> Dict[str, Any]:
         "high_risk_tools": sorted(HIGH_RISK_TOOLS),
         "risk_thresholds": {
             "block": BLOCK_THRESHOLD,
+            "incident": INCIDENT_THRESHOLD,
             "critical": CRITICAL_THRESHOLD,
             "output_block": OUTPUT_BLOCK_THRESHOLD,
             "output_redact": OUTPUT_REDACT_THRESHOLD,

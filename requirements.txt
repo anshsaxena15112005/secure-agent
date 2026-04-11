@@ -8,3 +8,5 @@ passlib[bcrypt]
 python-jose[cryptography]
 pytest
 httpx
+openai
+python-dotenv

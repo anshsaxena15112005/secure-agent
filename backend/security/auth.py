@@ -1,17 +1,23 @@
 from datetime import datetime, timedelta
 from typing import Optional
+
 import os
 import base64
 import hashlib
 import hmac
 
 from jose import JWTError, jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 
 from backend.app.db import SessionLocal, PlatformUser
 
-SECRET_KEY = "secureagent-super-secret-key-change-this"
+
+SECRET_KEY = os.getenv("SECRET_KEY", "secureagent-super-secret-key-change-this")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 
 def hash_password(password: str) -> str:
@@ -64,7 +70,9 @@ def authenticate_user(username: str, password: str) -> Optional[PlatformUser]:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -77,6 +85,28 @@ def decode_access_token(token: str):
         return None
 
 
+def get_current_user(token: str = Depends(oauth2_scheme)) -> PlatformUser:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    payload = decode_access_token(token)
+    if payload is None:
+        raise credentials_exception
+
+    username: Optional[str] = payload.get("sub")
+    if username is None:
+        raise credentials_exception
+
+    user = get_user_by_username(username)
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
 def seed_default_users():
     db = SessionLocal()
     try:
@@ -87,7 +117,9 @@ def seed_default_users():
         ]
 
         for username, password, role in users:
-            existing = db.query(PlatformUser).filter(PlatformUser.username == username).first()
+            existing = db.query(PlatformUser).filter(
+                PlatformUser.username == username
+            ).first()
             if not existing:
                 db.add(
                     PlatformUser(

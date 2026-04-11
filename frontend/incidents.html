@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SecureAgent Incidents</title>
+    <style>
+        :root {
+            --bg-1: #06121f;
+            --bg-2: #0a1b2e;
+            --bg-3: #10263b;
+            --panel: rgba(10, 20, 34, 0.58);
+            --panel-strong: rgba(12, 24, 42, 0.78);
+            --panel-soft: rgba(255, 255, 255, 0.04);
+            --border: rgba(126, 167, 255, 0.14);
+            --text: #ecf4ff;
+            --muted: #9bb0c7;
+            --accent: #6ea8ff;
+            --accent-2: #7af0d2;
+            --accent-3: #9b7bff;
+            --success: #63d89a;
+            --warning: #f0c46e;
+            --danger: #ff8585;
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+            --blur: blur(16px);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(110, 168, 255, 0.18), transparent 24%),
+                radial-gradient(circle at 85% 15%, rgba(122, 240, 210, 0.15), transparent 20%),
+                radial-gradient(circle at 70% 75%, rgba(155, 123, 255, 0.14), transparent 24%),
+                linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 48%, var(--bg-3) 100%);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(22px);
+            opacity: 0.28;
+            pointer-events: none;
+            z-index: 0;
+            animation: drift 16s ease-in-out infinite alternate;
+        }
+
+        .orb-1 {
+            width: 260px;
+            height: 260px;
+            top: 6%;
+            left: 4%;
+            background: radial-gradient(circle, rgba(110, 168, 255, 0.55), rgba(110, 168, 255, 0.05));
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            top: 55%;
+            right: 6%;
+            background: radial-gradient(circle, rgba(122, 240, 210, 0.45), rgba(122, 240, 210, 0.04));
+            animation-duration: 22s;
+        }
+
+        .orb-3 {
+            width: 240px;
+            height: 240px;
+            bottom: 5%;
+            left: 38%;
+            background: radial-gradient(circle, rgba(155, 123, 255, 0.42), rgba(155, 123, 255, 0.04));
+            animation-duration: 19s;
+        }
+
+        @keyframes drift {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(22px, -18px) scale(1.06);
+            }
+
+            100% {
+                transform: translate(-18px, 20px) scale(0.96);
+            }
+        }
+
+        #particle-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.55;
+        }
+
+        .layout {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 270px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            padding: 28px 18px;
+            border-right: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(6, 18, 31, 0.82), rgba(8, 17, 30, 0.52));
+            backdrop-filter: var(--blur);
+        }
+
+        .brand-wrap {
+            padding: 14px 14px 18px;
+            margin-bottom: 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .brand {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            background: linear-gradient(90deg, #ffffff, #99d6ff, #b6ffe8);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-sub {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .glow-line {
+            height: 1px;
+            width: 100%;
+            margin: 6px 0 0;
+            background: linear-gradient(90deg, transparent, rgba(110, 168, 255, 0.45), rgba(122, 240, 210, 0.35), transparent);
+            opacity: 0.75;
+        }
+
+        .nav {
+            display: grid;
+            gap: 10px;
+        }
+
+        .nav a {
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            color: var(--text);
+            padding: 13px 15px;
+            border-radius: 16px;
+            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.015);
+            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .nav a::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(110, 168, 255, 0.14), rgba(122, 240, 210, 0.08));
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .nav a span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            transform: translateX(4px);
+            background: rgba(255, 255, 255, 0.035);
+            border-color: var(--border);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+        }
+
+        .nav a:hover::before,
+        .nav a.active::before {
+            opacity: 1;
+        }
+
+        .main {
+            padding: 30px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .topbar h1 {
+            margin: 0;
+            font-size: 34px;
+            line-height: 1.1;
+            letter-spacing: 0.2px;
+        }
+
+        .topbar p {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .pulse-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 8px;
+            border-radius: 50%;
+            background: var(--accent-2);
+            box-shadow: 0 0 12px rgba(122, 240, 210, 0.7);
+            animation: pulse 1.8s infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.9);
+                opacity: 0.65;
+            }
+
+            50% {
+                transform: scale(1.25);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.9);
+                opacity: 0.65;
+            }
+        }
+
+        .user-box {
+            min-width: 230px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            backdrop-filter: var(--blur);
+            box-shadow: var(--shadow);
+        }
+
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .card {
+            position: relative;
+            overflow: hidden;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: var(--blur);
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 38%, transparent 62%, rgba(255, 255, 255, 0.03));
+            pointer-events: none;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            transition: transform 0.22s ease;
+        }
+
+        .card-title,
+        .card-value,
+        .card-sub,
+        .section-title,
+        .muted,
+        .status-line {
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-title {
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .card-value {
+            font-size: 34px;
+            font-weight: 800;
+        }
+
+        .card-sub {
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button,
+        .toolbar select {
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(18, 35, 59, 0.92), rgba(11, 22, 38, 0.92));
+            color: var(--text);
+            padding: 11px 16px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: 0.2s ease;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        .toolbar button:hover,
+        .toolbar select:hover {
+            transform: translateY(-1px);
+            border-color: rgba(126, 167, 255, 0.28);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+        }
+
+        .toolbar select {
+            background: rgba(14, 26, 44, 0.92);
+        }
+
+        .toolbar button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .section-title {
+            margin: 0 0 14px;
+            font-size: 19px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: capitalize;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .low {
+            background: rgba(99, 216, 154, 0.14);
+            color: #8ef0b6;
+        }
+
+        .medium {
+            background: rgba(240, 196, 110, 0.15);
+            color: #ffd892;
+        }
+
+        .high {
+            background: rgba(255, 133, 133, 0.14);
+            color: #ffaaaa;
+        }
+
+        .critical {
+            background: rgba(255, 91, 91, 0.18);
+            color: #ff9f9f;
+        }
+
+        .open {
+            background: rgba(240, 196, 110, 0.15);
+            color: #ffd892;
+        }
+
+        .acknowledged {
+            background: rgba(110, 168, 255, 0.14);
+            color: #9ec7ff;
+        }
+
+        .resolved {
+            background: rgba(99, 216, 154, 0.14);
+            color: #8ef0b6;
+        }
+
+        .empty {
+            color: var(--muted);
+            font-size: 14px;
+            padding: 16px 0;
+            text-align: center;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(18, 35, 59, 0.92), rgba(11, 22, 38, 0.92));
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.2s ease;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+        }
+
+        .btn-small:hover {
+            transform: translateY(-1px);
+            border-color: rgba(126, 167, 255, 0.28);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+        }
+
+        .btn-small:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.5s ease both;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .grid-cards {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 760px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .grid-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .main {
+                padding: 18px;
+            }
+
+            .topbar h1 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="particle-canvas"></canvas>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand-wrap">
+                <div class="brand">SecureAgent</div>
+                <div class="brand-sub">AI Runtime Security Platform</div>
+                <div class="glow-line"></div>
+            </div>
+
+            <nav class="nav">
+                <a href="/dashboard"><span>Dashboard</span></a>
+                <a href="/testing"><span>Testing</span></a>
+                <a href="/incidents" class="active"><span>Incidents</span></a>
+                <a href="/reports"><span>Reports</span></a>
+                <a href="/policy-editor" id="policy-link" hidden><span>Policy Editor</span></a>
+                <a href="#" id="logout-link"><span>Logout</span></a>
+            </nav>
+        </aside>
+
+        <main class="main">
+            <div class="topbar fade-in">
+                <div>
+                    <h1>Incident Center</h1>
+                    <p><span class="pulse-dot"></span>Review runtime security incidents</p>
+                </div>
+
+                <div class="user-box">
+                    <div><strong id="current-username">Loading...</strong></div>
+                    <div class="muted" id="current-role">Checking access</div>
+                </div>
+            </div>
+
+            <div class="toolbar fade-in">
+                <button id="refresh-btn" type="button">Refresh</button>
+
+                <select id="status-filter">
+                    <option value="">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+            </div>
+
+            <section class="grid-cards">
+                <div class="card fade-in">
+                    <div class="card-title">Total Incidents</div>
+                    <div class="card-value" id="total-incidents">0</div>
+                    <div class="card-sub">All recorded incidents</div>
+                </div>
+
+                <div class="card fade-in">
+                    <div class="card-title">Open</div>
+                    <div class="card-value" id="open-incidents">0</div>
+                    <div class="card-sub">Awaiting action</div>
+                </div>
+
+                <div class="card fade-in">
+                    <div class="card-title">Acknowledged</div>
+                    <div class="card-value" id="ack-incidents">0</div>
+                    <div class="card-sub">Under review</div>
+                </div>
+
+                <div class="card fade-in">
+                    <div class="card-title">Resolved</div>
+                    <div class="card-value" id="resolved-incidents">0</div>
+                    <div class="card-sub">Closed incidents</div>
+                </div>
+            </section>
+
+            <section class="card fade-in">
+                <h2 class="section-title">Incident Log</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Status</th>
+                                <th>Tool</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="incidents-body">
+                            <tr>
+                                <td colspan="7" class="empty">Loading incidents...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000/api/v1";
+        const TOKEN_KEY = "secureagent_token";
+        const USER_KEY = "secureagent_user";
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY);
+        }
+
+        function getAuthHeaders(json = false) {
+            const token = getToken();
+            const headers = {};
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+            if (json) headers["Content-Type"] = "application/json";
+            return headers;
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            window.location.href = "/login";
+        }
+
+        function formatDateTime(value) {
+            if (!value) return "—";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
+        }
+
+        async function apiGet(endpoint) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: "GET",
+                headers: getAuthHeaders()
+            });
+
+            if (response.status === 401) {
+                logout();
+                throw new Error("Unauthorized");
+            }
+
+            if (!response.ok) {
+                throw new Error(`GET ${endpoint} failed with ${response.status}`);
+            }
+
+            return response.json();
+        }
+
+        async function ensureLoggedIn() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = "/login";
+                return false;
+            }
+
+            try {
+                const user = await apiGet("/auth/me");
+
+                const usernameEl = document.getElementById("current-username");
+                const roleEl = document.getElementById("current-role");
+                const policyLink = document.getElementById("policy-link");
+
+                if (usernameEl) usernameEl.textContent = user.username || "User";
+                if (roleEl) roleEl.textContent = user.role || "member";
+                if (policyLink) policyLink.hidden = user.role !== "admin";
+
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+                return user;
+            } catch (error) {
+                logout();
+                return false;
+            }
+        }
+
+        function animateValue(el, endValue) {
+            const startValue = Number(el.textContent) || 0;
+            const duration = 500;
+            const startTime = performance.now();
+
+            function step(now) {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const value = Math.floor(startValue + (endValue - startValue) * progress);
+                el.textContent = value;
+                if (progress < 1) requestAnimationFrame(step);
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        function updateSummaryCards(incidents) {
+            const total = incidents.length;
+            const open = incidents.filter(i => (i.status || "").toLowerCase() === "open").length;
+            const acknowledged = incidents.filter(i => (i.status || "").toLowerCase() === "acknowledged").length;
+            const resolved = incidents.filter(i => (i.status || "").toLowerCase() === "resolved").length;
+
+            animateValue(document.getElementById("total-incidents"), total);
+            animateValue(document.getElementById("open-incidents"), open);
+            animateValue(document.getElementById("ack-incidents"), acknowledged);
+            animateValue(document.getElementById("resolved-incidents"), resolved);
+        }
+
+        function renderIncidents(incidents) {
+            const tbody = document.getElementById("incidents-body");
+
+            if (!incidents.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="empty">No incidents found.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = incidents.map((incident) => {
+                const id = incident.id ?? "—";
+                const time = incident.timestamp ?? "—";
+                const type = incident.category ?? incident.event_type ?? "Unknown";
+                const severity = (incident.severity ?? "low").toLowerCase();
+                const status = (incident.status ?? "open").toLowerCase();
+                const tool = incident.tool ?? incident.source ?? "—";
+                const reason = incident.message ?? incident.reason ?? "—";
+
+                return `
+                    <tr class="fade-in">
+                        <td>${id}</td>
+                        <td>${formatDateTime(time)}</td>
+                        <td>${type}</td>
+                        <td><span class="pill ${severity}">${severity}</span></td>
+                        <td><span class="pill ${status}">${status}</span></td>
+                        <td>${tool}</td>
+                        <td>${reason}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function fetchIncidents() {
+            const payload = await apiGet("/incidents");
+            return Array.isArray(payload) ? payload : [];
+        }
+
+        async function loadIncidents() {
+            const tbody = document.getElementById("incidents-body");
+            const filterValue = document.getElementById("status-filter").value.trim().toLowerCase();
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="empty">Loading incidents...</td>
+                </tr>
+            `;
+
+            try {
+                let incidents = await fetchIncidents();
+
+                updateSummaryCards(incidents);
+
+                if (filterValue) {
+                    incidents = incidents.filter(i => (i.status || "").toLowerCase() === filterValue);
+                }
+
+                renderIncidents(incidents);
+            } catch (error) {
+                console.error(error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="empty">Failed to load incidents.</td>
+                    </tr>
+                `;
+            }
+        }
+
+        function bindEvents() {
+            const refreshBtn = document.getElementById("refresh-btn");
+            const statusFilter = document.getElementById("status-filter");
+            const logoutLink = document.getElementById("logout-link");
+
+            refreshBtn.addEventListener("click", loadIncidents);
+            statusFilter.addEventListener("change", loadIncidents);
+            logoutLink.addEventListener("click", function (e) {
+                e.preventDefault();
+                logout();
+            });
+        }
+
+        function initParticles() {
+            const canvas = document.getElementById("particle-canvas");
+            const ctx = canvas.getContext("2d");
+            let particles = [];
+            let width = canvas.width = window.innerWidth;
+            let height = canvas.height = window.innerHeight;
+
+            function createParticles() {
+                particles = [];
+                const count = Math.min(90, Math.floor(width / 18));
+                for (let i = 0; i < count; i++) {
+                    particles.push({
+                        x: Math.random() * width,
+                        y: Math.random() * height,
+                        r: Math.random() * 2.2 + 0.6,
+                        dx: (Math.random() - 0.5) * 0.35,
+                        dy: (Math.random() - 0.5) * 0.35,
+                        a: Math.random() * 0.6 + 0.2
+                    });
+                }
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, width, height);
+
+                for (const p of particles) {
+                    p.x += p.dx;
+                    p.y += p.dy;
+
+                    if (p.x < 0) p.x = width;
+                    if (p.x > width) p.x = 0;
+                    if (p.y < 0) p.y = height;
+                    if (p.y > height) p.y = 0;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(180, 220, 255, ${p.a})`;
+                    ctx.fill();
+                }
+
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const p1 = particles[i];
+                        const p2 = particles[j];
+                        const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+                        if (dist < 120) {
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.strokeStyle = `rgba(120, 170, 255, ${0.09 * (1 - dist / 120)})`;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                requestAnimationFrame(draw);
+            }
+
+            window.addEventListener("resize", () => {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+                createParticles();
+            });
+
+            createParticles();
+            draw();
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            bindEvents();
+            initParticles();
+            const user = await ensureLoggedIn();
+            if (user) {
+                await loadIncidents();
+            }
+        });
+    </script>
+</body>
+
+</html>
